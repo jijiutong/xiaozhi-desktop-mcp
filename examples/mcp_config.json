@@ -7,10 +7,10 @@
         "xiaozhi_desktop_mcp.server"
       ],
       "env": {
-        "OBSIDIAN_VAULT": "/Users/jijiutong/obsidian",
+        "OBSIDIAN_VAULT": "/path/to/your/obsidian-vault",
         "OBSIDIAN_MEMORY_FILE": "00-Inbox/voice-memory.md",
         "CC_TASKS_DIR": "00-Inbox/cc-tasks",
-        "DEFAULT_PROJECT_ROOT": "/Users/jijiutong/plugin/smail_project/xiaozhi-desktop-mcp",
+        "DEFAULT_PROJECT_ROOT": "/path/to/your/project",
         "ALLOWED_APPS": "Obsidian,Xcode,Google Chrome,Terminal,Codex"
       }
     }

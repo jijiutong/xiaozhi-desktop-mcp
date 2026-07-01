@@ -18,6 +18,18 @@ POST /api/v1/dispatch
 
 Legacy `/tools/...` routes remain available for debugging and fine-grained control.
 
+If `DESKTOP_MCP_AUTH_TOKEN` is set, protected API and tool routes require either:
+
+```text
+Authorization: Bearer <token>
+```
+
+or:
+
+```text
+X-Desktop-Mcp-Token: <token>
+```
+
 ## Dispatch Request
 
 ```json
@@ -95,12 +107,14 @@ pending_cancel
 
 Use `GET /api/v1/actions` for machine-readable parameters and risk levels.
 
+Medium-risk actions such as `ask_cc`, `ask_cc_project`, `continue_cc`, and `stop_cc` create a pending action by default. Pass `"confirm": true` only when the client has already received explicit user confirmation.
+
 ## Safety Model
 
 - No arbitrary shell command action exists.
 - Project actions are constrained by `CC_ALLOWED_PROJECTS`.
 - App actions are constrained by `ALLOWED_APPS`.
 - Obsidian actions are constrained by `OBSIDIAN_VAULT`.
-- Medium-risk actions can be routed through pending actions.
+- Medium-risk API v1 actions are routed through pending actions unless `confirm=true` is supplied.
 
 See [security.md](security.md) for more detail.

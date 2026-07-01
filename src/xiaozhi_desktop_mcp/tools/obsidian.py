@@ -91,9 +91,12 @@ def search_notes(settings: Settings, query: str, limit: int = 5) -> dict:
     for path in sorted(vault.rglob("*.md")):
         if _should_skip(path, vault):
             continue
+        if path.is_symlink():
+            continue
         try:
-            text = path.read_text(encoding="utf-8", errors="ignore")
-        except OSError:
+            safe_path = ensure_inside(vault, path)
+            text = safe_path.read_text(encoding="utf-8", errors="ignore")
+        except (OSError, SafetyError):
             continue
         lower_text = text.lower()
         index = lower_text.find(needle.lower())

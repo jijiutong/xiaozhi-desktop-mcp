@@ -67,8 +67,8 @@ src/xiaozhi_desktop_mcp/tools/projects.py
 Java 侧桥接文件：
 
 ```text
-/Users/jijiutong/plugin/smail_project/xiaozhi-esp32-server-java/xiaozhi-server/src/main/java/com/xiaozhi/mcpserver/DesktopWorkflowTestService.java
-/Users/jijiutong/plugin/smail_project/xiaozhi-esp32-server-java/xiaozhi-dialogue/src/main/java/com/xiaozhi/dialogue/llm/tool/function/DesktopWorkflowFunction.java
+/path/to/xiaozhi-esp32-server-java/xiaozhi-server/src/main/java/com/xiaozhi/mcpserver/DesktopWorkflowTestService.java
+/path/to/xiaozhi-esp32-server-java/xiaozhi-dialogue/src/main/java/com/xiaozhi/dialogue/llm/tool/function/DesktopWorkflowFunction.java
 ```
 
 ## 设计原则
@@ -134,7 +134,7 @@ obsidian_save_memory
 Python 编译检查：
 
 ```bash
-cd /Users/jijiutong/plugin/smail_project/xiaozhi-desktop-mcp
+cd /path/to/xiaozhi-desktop-mcp
 . .venv/bin/activate
 python -m compileall src
 ```
@@ -151,7 +151,7 @@ xiaozhi-desktop-http
 curl -X POST http://127.0.0.1:8765/tools/cc/open-visible-session \
   -H "Content-Type: application/json" \
   -d '{
-    "project_path": "/Users/jijiutong/plugin/smail_project/xiaozhi-desktop-mcp",
+    "project_path": "/path/to/your/project",
     "cli": "claude",
     "cli_args": "",
     "terminal": "Terminal",
@@ -181,7 +181,7 @@ curl -X POST http://127.0.0.1:8765/tools/cc/stop-session \
 Java 编译检查：
 
 ```bash
-cd /Users/jijiutong/plugin/smail_project/xiaozhi-esp32-server-java
+cd /path/to/xiaozhi-esp32-server-java
 mvn -pl xiaozhi-server -am -DskipTests compile
 ```
 

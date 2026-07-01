@@ -27,6 +27,8 @@ ALLOWED_ACTION_TYPES = frozenset(
         "cc_send_slash_command",
         "cc_stop",
         "cc_switch_model",
+        "desktop_ask_cc",
+        "desktop_ask_cc_project",
     }
 )
 
@@ -163,6 +165,30 @@ def _execute(settings: Settings, action: PendingAction) -> dict:
             str(params.get("session_id", "default")),
             True,
         )
+    if action.action_type == "desktop_ask_cc":
+        from .workflows import ask_cc
+
+        return ask_cc(
+            settings,
+            str(params.get("text", "")),
+            str(params.get("project_path", "")),
+            str(params.get("session_id", "default")),
+            str(params.get("cli", "")),
+            str(params.get("terminal", "Terminal")),
+            bool(params.get("open_if_needed", True)),
+        )
+    if action.action_type == "desktop_ask_cc_project":
+        from .projects import ask_cc_project
+
+        return ask_cc_project(
+            settings,
+            str(params.get("project", "")),
+            str(params.get("text", "")),
+            str(params.get("session_id", "default")),
+            str(params.get("cli", "")),
+            str(params.get("terminal", "Terminal")),
+            bool(params.get("open_if_needed", True)),
+        )
     return fail(f"unsupported pending action type: {action.action_type}")
 
 
@@ -197,4 +223,8 @@ def _default_title(action_type: str, params: dict[str, Any]) -> str:
         return "退出 Claude Code"
     if action_type == "cc_switch_model":
         return f"切换模型到 {params.get('model', '')}"
+    if action_type == "desktop_ask_cc":
+        return "发送任务给 Claude Code"
+    if action_type == "desktop_ask_cc_project":
+        return f"发送任务到项目 {params.get('project', '')}"
     return action_type

@@ -3,7 +3,7 @@
 ## Start
 
 ```bash
-cd /Users/jijiutong/plugin/smail_project/xiaozhi-desktop-mcp
+cd /path/to/xiaozhi-desktop-mcp
 . .venv/bin/activate
 xiaozhi-desktop-http
 ```
@@ -38,6 +38,13 @@ Configuration summary:
 
 ```bash
 curl http://127.0.0.1:8765/tools/desktop/config-summary
+```
+
+If you bind the HTTP server to a non-localhost address, set `DESKTOP_MCP_AUTH_TOKEN`.
+
+```bash
+export DESKTOP_MCP_AUTH_TOKEN="change-me"
+curl -H "Authorization: Bearer change-me" http://127.0.0.1:8765/api/v1/actions
 ```
 
 ## Common Fixes

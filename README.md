@@ -81,6 +81,12 @@ ALLOWED_APPS=Obsidian,Terminal,Google Chrome
 xiaozhi-desktop-http
 ```
 
+如果把 HTTP 服务绑定到非本机地址，必须设置 `DESKTOP_MCP_AUTH_TOKEN`。调用受保护接口时传：
+
+```bash
+curl -H "Authorization: Bearer change-me" http://127.0.0.1:8765/api/v1/actions
+```
+
 检查服务：
 
 ```bash
@@ -258,7 +264,7 @@ curl http://127.0.0.1:8765/api/v1/actions
 | App | 只能操作 `ALLOWED_APPS` |
 | 项目 | 只能进入 `CC_ALLOWED_PROJECTS` |
 | Obsidian | 只能访问 `OBSIDIAN_VAULT` |
-| 中风险动作 | 走 pending action |
+| 中风险动作 | API v1 默认创建 pending action，`confirm=true` 才直接执行 |
 | 会话状态 | 仅保存进程内状态，重启清空 |
 
 ## 目录结构

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -28,6 +29,7 @@ from .tools.workflows import (
 
 
 ActionHandler = Callable[[Settings, dict[str, Any]], dict]
+logger = logging.getLogger(__name__)
 
 
 def dispatch(settings: Settings, action: str, params: dict | None = None, request_id: str = "") -> dict:
@@ -45,8 +47,9 @@ def dispatch(settings: Settings, action: str, params: dict | None = None, reques
             result = handler(settings, dict(params or {}))
         except TypeError as exc:
             result = fail(f"invalid params for action {normalized}: {exc}", "参数不完整或格式不对，我没有执行。")
-        except Exception as exc:  # Defensive boundary for API clients.
-            result = fail(f"action {normalized} failed: {exc}", "执行动作时发生异常。")
+        except Exception:
+            logger.exception("action %s failed", normalized)
+            result = fail(f"action {normalized} failed", "执行动作时发生异常。")
     return _envelope(normalized or action, result, request_id)
 
 
@@ -56,8 +59,8 @@ def actions_catalog() -> dict:
         _action("remember", "low", {"text": "string", "tags": "string optional"}, "Save memory to Obsidian."),
         _action("open_cc_project", "low", {"project_path": "string optional", "session_id": "string optional"}, "Open Claude Code/Codex by path."),
         _action("open_cc_project_named", "low", {"project": "string", "session_id": "string optional"}, "Open Claude Code/Codex by project alias."),
-        _action("ask_cc", "medium", {"text": "string", "project_path": "string optional"}, "Send instruction to Claude Code/Codex."),
-        _action("ask_cc_project", "medium", {"project": "string", "text": "string"}, "Send instruction by project alias."),
+        _action("ask_cc", "medium", {"text": "string", "project_path": "string optional", "confirm": "boolean optional"}, "Send instruction to Claude Code/Codex."),
+        _action("ask_cc_project", "medium", {"project": "string", "text": "string", "confirm": "boolean optional"}, "Send instruction by project alias."),
         _action("check_cc", "low", {"session_id": "string optional"}, "Check Claude Code/Codex status."),
         _action("continue_cc", "medium", {"session_id": "string optional", "confirm": "boolean optional"}, "Send yes/continue."),
         _action("focus_cc", "low", {"session_id": "string optional"}, "Focus Claude Code/Codex window."),
@@ -164,27 +167,61 @@ def _open_cc_project_named(settings: Settings, params: dict[str, Any]) -> dict:
 
 
 def _ask_cc(settings: Settings, params: dict[str, Any]) -> dict:
+    pending_params = {
+        "text": _str(params, "text"),
+        "project_path": _str(params, "project_path"),
+        "session_id": _str(params, "session_id", "default"),
+        "cli": _str(params, "cli"),
+        "terminal": _str(params, "terminal", "Terminal"),
+        "open_if_needed": _bool(params, "open_if_needed", True),
+    }
+    if not _bool(params, "confirm"):
+        return create_pending_action("desktop_ask_cc", pending_params, "发送任务给 Claude Code")
     return ask_cc(
         settings,
-        _str(params, "text"),
-        _str(params, "project_path"),
-        _str(params, "session_id", "default"),
-        _str(params, "cli"),
-        _str(params, "terminal", "Terminal"),
-        _bool(params, "open_if_needed", True),
+        pending_params["text"],
+        pending_params["project_path"],
+        pending_params["session_id"],
+        pending_params["cli"],
+        pending_params["terminal"],
+        bool(pending_params["open_if_needed"]),
     )
 
 
 def _ask_cc_project(settings: Settings, params: dict[str, Any]) -> dict:
+    pending_params = {
+        "project": _str(params, "project"),
+        "text": _str(params, "text"),
+        "session_id": _str(params, "session_id", "default"),
+        "cli": _str(params, "cli"),
+        "terminal": _str(params, "terminal", "Terminal"),
+        "open_if_needed": _bool(params, "open_if_needed", True),
+    }
+    if not _bool(params, "confirm"):
+        return create_pending_action("desktop_ask_cc_project", pending_params, "按项目发送任务给 Claude Code")
     return ask_cc_project(
         settings,
-        _str(params, "project"),
-        _str(params, "text"),
-        _str(params, "session_id", "default"),
-        _str(params, "cli"),
-        _str(params, "terminal", "Terminal"),
-        _bool(params, "open_if_needed", True),
+        pending_params["project"],
+        pending_params["text"],
+        pending_params["session_id"],
+        pending_params["cli"],
+        pending_params["terminal"],
+        bool(pending_params["open_if_needed"]),
     )
+
+
+def _continue_cc(settings: Settings, params: dict[str, Any]) -> dict:
+    session_id = _str(params, "session_id", "default")
+    if not _bool(params, "confirm"):
+        return create_pending_action("cc_continue", {"session_id": session_id}, "让 Claude Code 继续")
+    return continue_cc(settings, session_id, True)
+
+
+def _stop_cc(settings: Settings, params: dict[str, Any]) -> dict:
+    session_id = _str(params, "session_id", "default")
+    if not _bool(params, "confirm"):
+        return create_pending_action("cc_stop", {"session_id": session_id}, "停止 Claude Code 会话")
+    return stop_cc(session_id)
 
 
 def _pending_create(settings: Settings, params: dict[str, Any]) -> dict:
@@ -199,9 +236,9 @@ _ACTION_HANDLERS: dict[str, ActionHandler] = {
     "ask_cc": _ask_cc,
     "ask_cc_project": _ask_cc_project,
     "check_cc": lambda settings, params: check_cc(settings, _str(params, "session_id", "default"), _int(params, "max_chars")),
-    "continue_cc": lambda settings, params: continue_cc(settings, _str(params, "session_id", "default"), _bool(params, "confirm")),
+    "continue_cc": _continue_cc,
     "focus_cc": lambda settings, params: focus_cc(_str(params, "session_id", "default")),
-    "stop_cc": lambda settings, params: stop_cc(_str(params, "session_id", "default")),
+    "stop_cc": _stop_cc,
     "search_obsidian": lambda settings, params: search_notes(settings, _str(params, "query"), _int(params, "limit", 5)),
     "append_note": lambda settings, params: append_note(settings, _str(params, "note_path"), _str(params, "text"), _str(params, "heading")),
     "append_daily_note": lambda settings, params: append_daily_note(settings, _str(params, "text"), _str(params, "date"), _str(params, "folder", "daily")),

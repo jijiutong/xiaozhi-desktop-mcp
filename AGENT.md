@@ -1,0 +1,209 @@
+# AGENT.md
+
+给后续 Codex/Claude Code 接手这个项目看的说明。
+
+## 项目定位
+
+`xiaozhi-desktop-mcp` 是本机桌面工作流服务，用来把小智接到 Mac：
+
+- Obsidian 记忆落盘
+- macOS App 打开
+- cc/Codex 任务 Markdown 创建
+- Claude Code/Codex 可见 Terminal 控制
+- Claude Code/Codex 可见 Terminal/iTerm 启动与轻量 session 登记
+- 小智语音工作流 wrapper
+- Java 版小智后端 HTTP 桥接
+
+不要把它做成新的小智服务器，也不要在这里实现 LLM/RAG/ASR/TTS。
+
+当前稳定版本是 `1.0.0`。1.0 后默认保持 `/api/v1/...` 响应 envelope 兼容，不随意改 action 名、字段名或旧 `/tools/...` 路由。
+
+## 当前重要文件
+
+```text
+src/xiaozhi_desktop_mcp/config.py
+配置加载，所有 .env 项集中在这里。
+
+src/xiaozhi_desktop_mcp/api_v1.py
+语言无关 HTTP API dispatch。Java/Python/Go 等新客户端优先走 `/api/v1/dispatch`。
+
+src/xiaozhi_desktop_mcp/safety.py
+路径、App、CLI、slash policy 等安全边界。
+
+src/xiaozhi_desktop_mcp/server.py
+stdio MCP server 入口。
+
+src/xiaozhi_desktop_mcp/http_server.py
+FastAPI HTTP adapter，Java 后端主要打这里。
+
+src/xiaozhi_desktop_mcp/tools/cc_session.py
+Claude Code/Codex 会话控制：可见 Terminal/iTerm、输入、状态、模型切换、轻量 session 登记。
+
+src/xiaozhi_desktop_mcp/tools/cc_task.py
+只创建 Markdown 任务，不执行。
+
+src/xiaozhi_desktop_mcp/tools/apps.py
+打开或关闭白名单 App。
+
+src/xiaozhi_desktop_mcp/tools/obsidian.py
+保存记忆、追加笔记、每日笔记、搜索和读取最近记忆。所有路径必须留在 `OBSIDIAN_VAULT` 内。
+
+src/xiaozhi_desktop_mcp/tools/workflows.py
+语音友好 wrapper，只编排已有安全工具，不直接执行 AppleScript 或 shell。
+
+src/xiaozhi_desktop_mcp/tools/diagnostics.py
+环境自检和脱敏配置摘要，只读检查，不启动 Claude Code，不执行项目命令。
+
+src/xiaozhi_desktop_mcp/tools/pending_actions.py
+进程内待确认动作队列。确认执行只 dispatch 到白名单里的现有工具，不支持任意 shell。
+
+src/xiaozhi_desktop_mcp/tools/catalog.py
+给小智/Java 侧看的工具目录，帮助选择高层 `desktop_*` 入口。
+
+src/xiaozhi_desktop_mcp/tools/projects.py
+从 `CC_ALLOWED_PROJECTS` 生成项目目录和目录名别名；解析后仍必须通过白名单校验。
+```
+
+Java 侧桥接文件：
+
+```text
+/Users/jijiutong/plugin/smail_project/xiaozhi-esp32-server-java/xiaozhi-server/src/main/java/com/xiaozhi/mcpserver/DesktopWorkflowTestService.java
+/Users/jijiutong/plugin/smail_project/xiaozhi-esp32-server-java/xiaozhi-dialogue/src/main/java/com/xiaozhi/dialogue/llm/tool/function/DesktopWorkflowFunction.java
+```
+
+## 设计原则
+
+- 默认能玩，配置能锁。
+- 不新增任意 shell 执行能力。
+- 工具返回保持旧字段兼容，同时给小智播报用 `spoken_message` / `error_spoken_message`。
+- 不做复杂摘要，不做日志落盘，除非用户明确要求。
+- review/fix/test/git status 不需要单独工具，直接用 `cc_send_instruction` 输入中文给 Claude/Codex。
+- `/init`、`/compact`、`/clear`、`/model` 不需要单独包装，走 `cc_send_slash_command` 或 `cc_switch_model`。
+- 小智/Java 后端优先使用 `desktop_*` wrapper；底层 `cc_*` 工具主要用于精细控制和调试。
+- Java/Python/Go 等新客户端优先使用 `/api/v1/dispatch`；旧 `/tools/...` 路由保留兼容。
+- 新增 API v1 action 时，要同步 `api_v1.py` 里的 `_ACTION_HANDLERS` 和 `actions_catalog()`。
+- 新增或修改公共接口时同步 `docs/api.md`、必要时同步 `docs/clients.md` 和 `CHANGELOG.md`。
+- 先保持工具少而通用，不要把每句话都做成一个 action。
+
+## 当前保留的工具
+
+```text
+desktop_remember
+desktop_open_cc_project
+desktop_list_projects
+desktop_resolve_project
+desktop_open_cc_project_named
+desktop_ask_cc_project
+desktop_ask_cc
+desktop_check_cc
+desktop_continue_cc
+desktop_focus_cc
+desktop_stop_cc
+desktop_health_detail
+desktop_config_summary
+desktop_tool_catalog
+pending_action_create
+pending_action_list
+pending_action_confirm
+pending_action_cancel
+obsidian_append_note
+obsidian_append_daily_note
+obsidian_search
+obsidian_recent_memories
+cc_create_task
+cc_cleanup_sessions
+cc_start_session
+cc_open_visible_session
+cc_open_claude_code
+cc_list_sessions
+cc_session_status
+cc_focus_session
+cc_send_instruction
+cc_send_decision
+cc_send_slash_command
+cc_switch_model
+cc_stop_session
+cc_close_terminal
+app_open
+app_close
+obsidian_save_memory
+```
+
+## 测试命令
+
+Python 编译检查：
+
+```bash
+cd /Users/jijiutong/plugin/smail_project/xiaozhi-desktop-mcp
+. .venv/bin/activate
+python -m compileall src
+```
+
+启动 HTTP adapter：
+
+```bash
+xiaozhi-desktop-http
+```
+
+打开可见 Claude：
+
+```bash
+curl -X POST http://127.0.0.1:8765/tools/cc/open-visible-session \
+  -H "Content-Type: application/json" \
+  -d '{
+    "project_path": "/Users/jijiutong/plugin/smail_project/xiaozhi-desktop-mcp",
+    "cli": "claude",
+    "cli_args": "",
+    "terminal": "Terminal",
+    "session_id": "default"
+  }'
+```
+
+发送中文指令给可见 Terminal 会话：
+
+```bash
+curl -X POST http://127.0.0.1:8765/tools/cc/send-instruction \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_id": "default",
+    "text": "帮我 review 当前项目，重点看 bug 和风险。"
+  }'
+```
+
+关闭 Claude Code 和前台 Terminal 窗口：
+
+```bash
+curl -X POST http://127.0.0.1:8765/tools/cc/stop-session \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": "default"}'
+```
+
+Java 编译检查：
+
+```bash
+cd /Users/jijiutong/plugin/smail_project/xiaozhi-esp32-server-java
+mvn -pl xiaozhi-server -am -DskipTests compile
+```
+
+## 不要踩的坑
+
+- `claude -c` 在没有历史会话时会直接退出并显示 `No conversation found to continue`。
+- 当前 cc 操作默认统一走可见 Terminal，不使用后台 pty。
+- `cc_open_visible_session` / `cc_start_session` 会登记 `session_id`，并给 Terminal tab 或 iTerm session 设置 `xiaozhi-desktop-mcp:<session_id>` 标题。
+- `cc_send_instruction`、`cc_send_decision`、`cc_send_slash_command`、`cc_session_status` 会优先按登记过的 `session_id` 定位已打标的 tab/session；未登记时回退到 Terminal 当前选中 tab。
+- `cc_focus_session` 可把已登记会话拉回前台；如果用户手动改掉 tab/session 标题，定位会失败。
+- 会话列表不准时调用 `cc_cleanup_sessions` 清理失效登记。
+- 排障优先调用 `desktop_health_detail`，再看 `desktop_config_summary`。
+- Java/小智需要能力说明时调用 `desktop_tool_catalog`。
+- 语音里用户说项目名时优先用 `desktop_ask_cc_project` 或 `desktop_open_cc_project_named`；项目别名来自 allowed project 的目录名。
+- pending action 当前只存在内存里，服务重启会清空；允许动作类型在 `pending_actions.py` 的 `ALLOWED_ACTION_TYPES`。
+- Obsidian 搜索只读 `.md` 文件，跳过隐藏目录，返回数量和片段长度都有上限。
+- 改了 HTTP/MCP 工具后，需要重启 `xiaozhi-desktop-http`。
+- 改了 Java 工具后，需要重启 Java server/dialogue。
+- 如果 Java 运行在容器里，`127.0.0.1:8765` 指向容器自己，需要改 `desktop.mcp.base-url`。
+
+## 下一步建议
+
+- README 继续保持第一屏可用，不要写成论文。
+- Java 工具描述可以继续优化，让 LLM 更容易选择 `desktop_workflow`。
+- 后续如果要做日志/摘要/loop，先加配置开关，默认关闭。

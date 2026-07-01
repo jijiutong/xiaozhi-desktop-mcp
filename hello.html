@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>你好</title>
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+      background: linear-gradient(160deg, #fef9f4 0%, #f5ebe0 40%, #ede0d1 100%);
+      overflow: hidden;
+    }
+
+    /* 装饰光晕 */
+    .glow {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.35;
+      pointer-events: none;
+    }
+
+    .glow--warm {
+      width: 500px;
+      height: 500px;
+      background: #e8b894;
+      top: -180px;
+      right: -120px;
+      animation: drift 10s ease-in-out infinite;
+    }
+
+    .glow--cool {
+      width: 350px;
+      height: 350px;
+      background: #c9b99a;
+      bottom: -100px;
+      left: -80px;
+      animation: drift 8s ease-in-out infinite reverse;
+    }
+
+    @keyframes drift {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-25px); }
+    }
+
+    main {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: clamp(3.5rem, 2rem + 10vw, 9rem);
+      font-weight: 700;
+      color: #4a3228;
+      letter-spacing: 0.06em;
+      animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .subtitle {
+      margin-top: 1rem;
+      font-size: clamp(0.85rem, 1.2vw, 1.1rem);
+      color: #9b7e6b;
+      letter-spacing: 0.1em;
+      animation: rise 0.7s 0.12s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .divider {
+      width: 48px;
+      height: 2px;
+      background: #d4b896;
+      margin: 1.25rem auto 0;
+      border-radius: 1px;
+      animation: rise 0.6s 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    @keyframes rise {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="glow glow--warm"></div>
+  <div class="glow glow--cool"></div>
+
+  <main>
+    <h1>你好</h1>
+    <p class="subtitle">Hello · こんにちは · Bonjour</p>
+    <div class="divider"></div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,2 @@
+"""Xiaozhi desktop MCP tools."""
+

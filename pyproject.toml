@@ -1,0 +1,21 @@
+[project]
+name = "xiaozhi-desktop-mcp"
+version = "1.0.0"
+description = "Personal desktop workflow MCP tools for Xiaozhi: Obsidian memory, app launch, and safe local automation."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.8.1",
+    "python-dotenv>=1.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.31.0",
+    "pexpect>=4.9.0",
+]
+
+[project.scripts]
+xiaozhi-desktop-mcp = "xiaozhi_desktop_mcp.server:main"
+xiaozhi-desktop-http = "xiaozhi_desktop_mcp.http_server:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

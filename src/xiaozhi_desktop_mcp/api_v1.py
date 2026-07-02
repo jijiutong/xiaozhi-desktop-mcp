@@ -10,6 +10,7 @@ from .tools.apps import close_app, open_app
 from .tools.catalog import tool_catalog
 from .tools.cc_session import cleanup_sessions, send_slash_command, switch_model
 from .tools.diagnostics import config_summary, health_detail
+from .tools.intent import desktop_intent, desktop_intent_catalog
 from .tools.obsidian import append_daily_note, append_note, create_note, open_note, recent_memories, search_notes
 from .tools.pending_actions import (
     cancel_pending_action,
@@ -158,6 +159,13 @@ def actions_catalog() -> dict:
         _action("health", "low", {}, "Run desktop MCP health checks."),
         _action("config_summary", "low", {}, "Return non-secret config summary."),
         _action("tool_catalog", "low", {}, "Return reader-facing tool catalog."),
+        _action("category_registry", "low", {}, "Return desktop category registry."),
+        _action(
+            "desktop_intent",
+            "variable",
+            {"category": "string", "intent": "string", "params": "object optional"},
+            "Route a generic desktop category intent.",
+        ),
         _action("list_projects", "low", {}, "List allowed projects."),
         _action("resolve_project", "low", {"project": "string"}, "Resolve project alias/path."),
         _action("cleanup_sessions", "low", {}, "Clean stale Claude Code/Codex session registrations."),
@@ -480,6 +488,13 @@ _ACTION_HANDLERS: dict[str, ActionHandler] = {
     "health": lambda settings, params: health_detail(settings),
     "config_summary": lambda settings, params: config_summary(settings),
     "tool_catalog": lambda settings, params: tool_catalog(),
+    "category_registry": lambda settings, params: desktop_intent_catalog(settings),
+    "desktop_intent": lambda settings, params: desktop_intent(
+        settings,
+        _str(params, "category"),
+        _str(params, "intent"),
+        params.get("params") if isinstance(params.get("params"), dict) else params,
+    ),
     "list_projects": lambda settings, params: list_projects(settings),
     "resolve_project": lambda settings, params: resolve_project(settings, _str(params, "project")),
     "cleanup_sessions": lambda settings, params: cleanup_sessions(),

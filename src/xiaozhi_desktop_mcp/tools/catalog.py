@@ -13,6 +13,18 @@ def tool_catalog() -> dict:
             "api_v1_action": "remember",
         },
         {
+            "name": "desktop_intent",
+            "risk": "variable",
+            "use_when": "新客户端或语音入口要按 music/docs/ai/dev/browser/system 分类执行通用桌面意图。",
+            "api_v1_action": "desktop_intent",
+        },
+        {
+            "name": "desktop_category_registry",
+            "risk": "low",
+            "use_when": "客户端启动时要发现通用桌面能力分类和可用意图。",
+            "api_v1_action": "category_registry",
+        },
+        {
             "name": "app_open",
             "risk": "low",
             "use_when": "用户要打开 Xcode、Obsidian、浏览器或其他白名单 App。",

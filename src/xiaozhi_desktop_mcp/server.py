@@ -31,6 +31,10 @@ from .tools.diagnostics import (
     config_summary as desktop_config_summary_impl,
     health_detail as desktop_health_detail_impl,
 )
+from .tools.intent import (
+    desktop_intent as desktop_intent_impl,
+    desktop_intent_catalog as desktop_intent_catalog_impl,
+)
 from .tools.obsidian import (
     append_daily_note as append_daily_note_impl,
     append_note as append_note_impl,
@@ -420,6 +424,18 @@ def desktop_config_summary() -> dict:
 def desktop_tool_catalog() -> dict:
     """返回桌面 MCP 工具目录，帮助小智/Java 选择高层工具。"""
     return desktop_tool_catalog_impl()
+
+
+@mcp.tool()
+def desktop_category_registry() -> dict:
+    """返回通用桌面能力分类，例如 music、docs、ai、dev、browser、system。"""
+    return desktop_intent_catalog_impl(settings)
+
+
+@mcp.tool()
+def desktop_intent(category: str, intent: str, params: dict | None = None) -> dict:
+    """通用桌面意图入口：按 category + intent 路由到底层安全能力。"""
+    return desktop_intent_impl(settings, category, intent, params)
 
 
 @mcp.tool()

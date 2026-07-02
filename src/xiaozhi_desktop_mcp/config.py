@@ -20,6 +20,7 @@ class Settings:
     obsidian_vault: Path
     obsidian_memory_file: str
     cc_tasks_dir: Path
+    desktop_config_path: Path
     default_project_root: str
     allowed_apps: frozenset[str]
     cc_allowed_projects: frozenset[Path]
@@ -74,14 +75,18 @@ def load_settings() -> Settings:
     memory_file = os.getenv("OBSIDIAN_MEMORY_FILE", "00-Inbox/voice-memory.md")
     cc_tasks_dir_value = os.getenv("CC_TASKS_DIR", "00-Inbox/cc-tasks")
     cc_tasks_dir = Path(cc_tasks_dir_value).expanduser()
+    desktop_config_path = Path(os.getenv("DESKTOP_MCP_CONFIG", "desktop-mcp.yaml")).expanduser()
 
     # 允许用户填绝对路径；如果是相对路径，就固定放到 Obsidian vault 内。
     if not cc_tasks_dir.is_absolute():
         cc_tasks_dir = vault / cc_tasks_dir
     cc_tasks_dir = cc_tasks_dir.resolve()
+    if not desktop_config_path.is_absolute():
+        desktop_config_path = Path.cwd() / desktop_config_path
+    desktop_config_path = desktop_config_path.resolve()
     default_project_root = os.getenv("DEFAULT_PROJECT_ROOT", "")
     allowed_apps = _split_csv(
-        os.getenv("ALLOWED_APPS", "Obsidian,Xcode,Google Chrome,Terminal")
+        os.getenv("ALLOWED_APPS", "Obsidian,Xcode,Google Chrome,Safari,Music,Finder,Terminal")
     )
 
     # cc/Claude Code/Codex 会话配置：默认能玩，后续可以通过 .env 收紧。
@@ -108,6 +113,7 @@ def load_settings() -> Settings:
         obsidian_vault=vault,
         obsidian_memory_file=memory_file,
         cc_tasks_dir=cc_tasks_dir,
+        desktop_config_path=desktop_config_path,
         default_project_root=default_project_root,
         allowed_apps=allowed_apps,
         cc_allowed_projects=cc_allowed_projects,

@@ -23,6 +23,7 @@ dependencies = [
     "fastapi>=0.115.0",
     "uvicorn>=0.31.0",
     "pexpect>=4.9.0",
+    "PyYAML>=6.0.0",
 ]
 
 [project.optional-dependencies]

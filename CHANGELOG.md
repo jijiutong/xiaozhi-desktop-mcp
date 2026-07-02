@@ -15,6 +15,9 @@
 - Added API v1 and MCP actions for Claude Code/Codex slash commands and model switching.
 - Added Obsidian note create/open actions with vault path safety.
 - Added Xcode project open, build, test, clean, and recent error summary actions constrained by `XCODE_ALLOWED_PROJECTS`.
+- Added `desktop-mcp.yaml`, `category_registry`, and `desktop_intent` for generic category-based desktop workflows.
+- Added built-in category adapters for music, docs, AI, dev, browser, and system intents.
+- Added browser open/search, Music controls, Finder safe path open/reveal, and clipboard get/set capabilities through `desktop_intent`.
 
 ## 1.0.0 - 2026-07-01
 

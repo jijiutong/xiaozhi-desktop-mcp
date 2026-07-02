@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "categories": {
+    "music": {
+      "default_app": "Music",
+      "apps": ["Music", "Spotify"],
+      "intents": ["open", "play", "pause", "toggle", "next", "previous", "search"]
+    },
+    "docs": {
+      "default_app": "Obsidian",
+      "apps": ["Obsidian"],
+      "intents": ["remember", "search", "create", "open", "append", "daily"]
+    },
+    "ai": {
+      "default_app": "Claude Code",
+      "apps": ["Claude Code", "Codex"],
+      "intents": ["open", "send", "continue", "status", "focus", "stop", "slash", "model"]
+    },
+    "dev": {
+      "default_app": "Xcode",
+      "apps": ["Xcode"],
+      "intents": ["open", "build", "test", "clean", "errors"]
+    },
+    "browser": {
+      "default_app": "Google Chrome",
+      "apps": ["Google Chrome", "Safari", "Arc"],
+      "intents": ["open", "search"]
+    },
+    "system": {
+      "default_app": "Finder",
+      "apps": ["Finder"],
+      "intents": ["open", "reveal", "clipboard_get", "clipboard_set"]
+    }
+  }
+}

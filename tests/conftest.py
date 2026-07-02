@@ -27,6 +27,7 @@ def settings(tmp_path: Path) -> Settings:
         obsidian_vault=vault,
         obsidian_memory_file="memory.md",
         cc_tasks_dir=vault / "tasks",
+        desktop_config_path=tmp_path / "desktop-mcp.yaml",
         default_project_root=str(project),
         allowed_apps=frozenset({"Obsidian", "Terminal"}),
         cc_allowed_projects=frozenset({project}),

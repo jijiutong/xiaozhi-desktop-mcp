@@ -18,6 +18,8 @@ POST /api/v1/dispatch
 
 HTTP clients should use `POST /api/v1/dispatch`. Legacy `/tools/...` HTTP routes were removed to keep one safety policy.
 
+New voice clients should prefer `desktop_intent` for broad desktop workflows, then fall back to specific actions when they need exact control.
+
 If `DESKTOP_MCP_AUTH_TOKEN` is set, protected API routes require either:
 
 ```text
@@ -80,6 +82,8 @@ Clients should display or speak `spoken_message` on success and `error_spoken_me
 ## Common Actions
 
 ```text
+desktop_intent
+category_registry
 remember
 list_projects
 resolve_project
@@ -116,6 +120,33 @@ pending_confirm
 pending_cancel
 ```
 
+Generic intent request:
+
+```json
+{
+  "request_id": "voice-001",
+  "action": "desktop_intent",
+  "params": {
+    "category": "browser",
+    "intent": "search",
+    "params": {
+      "query": "desktop mcp"
+    }
+  }
+}
+```
+
+Built-in categories:
+
+```text
+music    open, play, pause, toggle, next, previous, search
+docs     remember, search, create, open, append, daily
+ai       open, send, continue, status, focus, stop, slash, model
+dev      open, build, test, clean, errors
+browser  open, search
+system   open, reveal, clipboard_get, clipboard_set
+```
+
 Use `GET /api/v1/actions` for machine-readable parameters and risk levels.
 
 Medium-risk actions such as `ask_cc`, `ask_cc_project`, `continue_cc`, `stop_cc`, `app_close`, `cc_send_slash_command`, `cc_switch_model`, `xcode_build`, `xcode_test`, and `xcode_clean` create a pending action by default. Pass `"confirm": true` only when the client has already received explicit user confirmation.
@@ -129,6 +160,7 @@ Claude Code/Codex send, continue, and stop actions require a registered session 
 - App actions are constrained by `ALLOWED_APPS`.
 - Obsidian actions are constrained by `OBSIDIAN_VAULT`.
 - Xcode actions are constrained by `XCODE_ALLOWED_PROJECTS`.
+- Finder path actions are constrained to Obsidian, task, and allowlisted project roots.
 - Medium-risk API v1 actions are routed through pending actions unless `confirm=true` is supplied.
 
 See [security.md](security.md) for more detail.

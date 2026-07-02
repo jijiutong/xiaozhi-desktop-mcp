@@ -11,6 +11,9 @@ These actions are enabled in the first version:
 - Create pending cc/Codex task files.
 - Open applications listed in `ALLOWED_APPS`.
 - Open Xcode projects inside `XCODE_ALLOWED_PROJECTS`.
+- Browser opens only http(s) URLs and only through allowlisted browser apps.
+- Finder opens paths only inside known safe roots.
+- Clipboard set/get is explicit under the `system` category.
 
 All generated files are written inside configured directories.
 
@@ -39,6 +42,14 @@ These actions should stay disabled unless a user explicitly opts in with strong 
 - cc/Codex task files must stay inside `CC_TASKS_DIR`.
 - macOS app launching is limited by `ALLOWED_APPS`.
 - Xcode project operations must stay inside `XCODE_ALLOWED_PROJECTS`.
+- Finder path operations must stay inside Obsidian, task, cc project, or Xcode project roots.
+
+## Generic Intent Rules
+
+- `desktop_intent` is a router, not arbitrary execution.
+- Supported categories are `music`, `docs`, `ai`, `dev`, `browser`, and `system`.
+- Unknown category/intent pairs are rejected.
+- `desktop-mcp.yaml` can describe categories for clients, but built-in actions still enforce code-level safety checks.
 
 ## HTTP Rules
 

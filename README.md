@@ -2,7 +2,7 @@
 
 把小智接到本机 Mac 工作流的桌面 MCP 服务
 
-从 Obsidian 记忆、App 控制，到 Claude Code / Codex 可见会话、项目别名、待确认动作和多语言 HTTP 接入。  
+从通用桌面意图、Obsidian 记忆、App 控制，到 Claude Code / Codex 可见会话、项目别名、待确认动作和多语言 HTTP 接入。
 一套面向语音助手、桌面自动化和本地 AI 编程工作流的安全工具层。
 
 中文 · [API](docs/api.md) · [Client Examples](docs/clients.md) · [Operations](docs/operations.md) · [Security](docs/security.md)
@@ -15,8 +15,10 @@ License: MIT · Version: 1.0.0 · MCP / HTTP Desktop Workflow
 ```text
 Voice / Client
   -> API v1 Dispatch
+  -> desktop_intent / Category Registry
   -> Safety Checks
-  -> Obsidian / App / Claude Code / Pending Action
+  -> Music / Docs / AI / Dev / Browser / System
+  -> Built-in Tools / Pending Action
   -> Spoken Result
 ```
 
@@ -47,12 +49,15 @@ Xiaozhi Desktop MCP 把这些约束编码成一套稳定接口：
 | 能力 | 覆盖范围 |
 | --- | --- |
 | API v1 | `GET /api/v1/actions`、`GET /api/v1/health`、`POST /api/v1/dispatch` |
+| 通用意图 | `desktop_intent` 统一路由 `music`、`docs`、`ai`、`dev`、`browser`、`system` |
+| 分类注册表 | `desktop-mcp.yaml` + 内置 category registry，给语音客户端做能力发现 |
 | 多语言接入 | Java、Python、Go 或任意 HTTP 客户端 |
 | Obsidian | 保存记忆、新建/打开/追加笔记、每日笔记、搜索、读取最近记忆 |
 | Claude Code / Codex | 打开项目、发送任务、slash 命令、切模型、查看状态、继续、聚焦、停止 |
 | 项目别名 | 从 `CC_ALLOWED_PROJECTS` 生成安全项目目录 |
 | App 控制 | 打开或关闭 `ALLOWED_APPS` 白名单内的 macOS App |
 | Xcode | 打开项目、build、test、clean、查看最近错误摘要 |
+| 通用桌面 | Music 播放控制、浏览器打开/搜索、Finder 打开/定位、剪贴板读写 |
 | 待确认动作 | 中风险动作先入队，确认后执行 |
 | 自检与目录 | 环境自检、配置摘要、工具目录、会话清理 |
 
@@ -71,10 +76,11 @@ cp .env.example .env
 
 ```env
 OBSIDIAN_VAULT=/path/to/your/obsidian-vault
+DESKTOP_MCP_CONFIG=desktop-mcp.yaml
 DEFAULT_PROJECT_ROOT=/path/to/your/project
 CC_ALLOWED_PROJECTS=/path/to/your/project
 XCODE_ALLOWED_PROJECTS=/path/to/your/project
-ALLOWED_APPS=Obsidian,Terminal,Google Chrome
+ALLOWED_APPS=Obsidian,Xcode,Google Chrome,Safari,Music,Finder,Terminal
 ```
 
 启动 HTTP 服务：
@@ -101,6 +107,20 @@ curl http://127.0.0.1:8765/api/v1/health
 
 ```text
 POST /api/v1/dispatch
+```
+
+通用语音入口优先使用：
+
+```json
+{
+  "request_id": "voice-001",
+  "action": "desktop_intent",
+  "params": {
+    "category": "music",
+    "intent": "next",
+    "params": {}
+  }
+}
 ```
 
 请求：
@@ -228,6 +248,8 @@ func main() {
 
 | 任务 | Action |
 | --- | --- |
+| 通用桌面意图 | `desktop_intent` |
+| 查看分类能力 | `category_registry` |
 | 保存一条记忆 | `remember` |
 | 列出允许项目 | `list_projects` |
 | 按项目名交给 Claude Code | `ask_cc_project` |
@@ -247,6 +269,10 @@ func main() {
 | Xcode 测试 | `xcode_test` |
 | Xcode 清理 | `xcode_clean` |
 | 查看 Xcode 最近错误 | `xcode_last_errors` |
+| 音乐播放/下一首/暂停 | `desktop_intent` + `music` |
+| 浏览器打开/搜索 | `desktop_intent` + `browser` |
+| Finder 打开/定位路径 | `desktop_intent` + `system` |
+| 剪贴板读写 | `desktop_intent` + `system` |
 | 创建待确认动作 | `pending_create` |
 | 确认待执行动作 | `pending_confirm` |
 | 桌面环境自检 | `health` |
@@ -269,6 +295,9 @@ curl http://127.0.0.1:8765/api/v1/actions
 小智，搜索 Obsidian 里关于桌面 MCP 的笔记。
 小智，打开 Xcode 项目并构建。
 小智，创建一篇 Obsidian 笔记，标题是今天的想法。
+小智，音乐下一首。
+小智，用浏览器搜索 desktop mcp。
+小智，把这段话复制到剪贴板。
 ```
 
 ## 安全边界
@@ -280,6 +309,7 @@ curl http://127.0.0.1:8765/api/v1/actions
 | 项目 | 只能进入 `CC_ALLOWED_PROJECTS` |
 | Xcode | 只能操作 `XCODE_ALLOWED_PROJECTS` |
 | Obsidian | 只能访问 `OBSIDIAN_VAULT` |
+| Finder | 只能打开 Obsidian、任务目录、允许项目内路径 |
 | 中风险动作 | API v1 默认创建 pending action，`confirm=true` 才直接执行 |
 | 会话状态 | 仅保存进程内状态，重启清空 |
 
@@ -290,6 +320,7 @@ curl http://127.0.0.1:8765/api/v1/actions
 | `src/xiaozhi_desktop_mcp/api_v1.py` | 多语言统一 dispatch API |
 | `src/xiaozhi_desktop_mcp/http_server.py` | FastAPI HTTP 服务 |
 | `src/xiaozhi_desktop_mcp/server.py` | MCP stdio 服务 |
+| `desktop-mcp.yaml` | 通用桌面 category registry 配置 |
 | `src/xiaozhi_desktop_mcp/tools/` | Obsidian、App、cc、项目、待确认动作等工具 |
 | `docs/api.md` | API 协议 |
 | `docs/clients.md` | Java / Python / Go 示例 |

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -64,6 +65,48 @@ def append_note(settings: Settings, note_path: str, text: str, heading: str = ""
         f"已追加到 {target.name}。",
         "appended note to Obsidian",
     )
+
+
+def create_note(settings: Settings, note_path: str, text: str = "", overwrite: bool = False) -> dict:
+    """Create a Markdown note inside the configured Obsidian vault."""
+    try:
+        target = _resolve_note_path(settings, note_path)
+    except SafetyError as exc:
+        return fail(str(exc), "目标笔记不在 Obsidian 库里，我没有创建。")
+    if target.exists() and not overwrite:
+        return fail("note already exists", "这篇笔记已经存在，我没有覆盖。", {"path": str(target)})
+    target.parent.mkdir(parents=True, exist_ok=True)
+    content = text.strip()
+    if content:
+        body = content + "\n"
+    else:
+        title = target.stem.replace("-", " ").strip() or "Untitled"
+        body = f"# {title}\n"
+    target.write_text(body, encoding="utf-8")
+    return ok({"path": str(target)}, f"已创建 {target.name}。", "created Obsidian note")
+
+
+def open_note(settings: Settings, note_path: str) -> dict:
+    """Open a Markdown note inside the configured Obsidian vault."""
+    try:
+        target = _resolve_note_path(settings, note_path)
+    except SafetyError as exc:
+        return fail(str(exc), "目标笔记不在 Obsidian 库里，我没有打开。")
+    if not target.exists():
+        return fail("note does not exist", "这篇笔记还不存在，我没有打开。", {"path": str(target)})
+    completed = subprocess.run(
+        ["open", str(target)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0:
+        return fail(
+            completed.stderr.strip() or completed.stdout.strip(),
+            "Obsidian 笔记没有打开成功。",
+            {"path": str(target)},
+        )
+    return ok({"path": str(target)}, f"已打开 {target.name}。", "opened Obsidian note")
 
 
 def append_daily_note(settings: Settings, text: str, date: str = "", folder: str = "daily") -> dict:

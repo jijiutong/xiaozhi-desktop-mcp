@@ -6,10 +6,11 @@ from typing import Any
 
 from .config import Settings
 from .responses import fail, ok
+from .tools.apps import close_app, open_app
 from .tools.catalog import tool_catalog
-from .tools.cc_session import cleanup_sessions
+from .tools.cc_session import cleanup_sessions, send_slash_command, switch_model
 from .tools.diagnostics import config_summary, health_detail
-from .tools.obsidian import append_daily_note, append_note, recent_memories, search_notes
+from .tools.obsidian import append_daily_note, append_note, create_note, open_note, recent_memories, search_notes
 from .tools.pending_actions import (
     cancel_pending_action,
     confirm_pending_action,
@@ -26,6 +27,7 @@ from .tools.workflows import (
     remember,
     stop_cc,
 )
+from .tools.xcode import open_xcode_project, xcode_build, xcode_clean, xcode_last_errors, xcode_test
 
 ActionHandler = Callable[[Settings, dict[str, Any]], dict]
 logger = logging.getLogger(__name__)
@@ -56,6 +58,8 @@ def actions_catalog() -> dict:
     """Return machine-friendly action definitions for API clients."""
     actions = [
         _action("remember", "low", {"text": "string", "tags": "string optional"}, "Save memory to Obsidian."),
+        _action("app_open", "low", {"app_name": "string"}, "Open an allowlisted macOS app."),
+        _action("app_close", "medium", {"app_name": "string", "confirm": "boolean optional"}, "Close an app."),
         _action(
             "open_cc_project",
             "low",
@@ -92,6 +96,29 @@ def actions_catalog() -> dict:
         ),
         _action("check_cc", "low", {"session_id": "string optional"}, "Check Claude Code/Codex status."),
         _action(
+            "cc_send_slash_command",
+            "medium",
+            {
+                "command": "string",
+                "args": "string optional",
+                "session_id": "string optional",
+                "confirm": "boolean optional",
+                "allow_frontmost": "boolean optional",
+            },
+            "Send a slash command to Claude Code/Codex.",
+        ),
+        _action(
+            "cc_switch_model",
+            "medium",
+            {
+                "model": "string",
+                "session_id": "string optional",
+                "confirm": "boolean optional",
+                "allow_frontmost": "boolean optional",
+            },
+            "Switch Claude Code/Codex model.",
+        ),
+        _action(
             "continue_cc",
             "medium",
             {
@@ -114,6 +141,13 @@ def actions_catalog() -> dict:
         ),
         _action("search_obsidian", "low", {"query": "string", "limit": "integer optional"}, "Search Obsidian notes."),
         _action(
+            "create_note",
+            "low",
+            {"note_path": "string", "text": "string optional", "overwrite": "boolean optional"},
+            "Create an Obsidian note.",
+        ),
+        _action("open_note", "low", {"note_path": "string"}, "Open an Obsidian note."),
+        _action(
             "append_note",
             "low",
             {"note_path": "string", "text": "string"},
@@ -127,6 +161,31 @@ def actions_catalog() -> dict:
         _action("list_projects", "low", {}, "List allowed projects."),
         _action("resolve_project", "low", {"project": "string"}, "Resolve project alias/path."),
         _action("cleanup_sessions", "low", {}, "Clean stale Claude Code/Codex session registrations."),
+        _action(
+            "xcode_open_project",
+            "low",
+            {"project_path": "string optional", "xcode_path": "string optional"},
+            "Open an allowlisted Xcode project.",
+        ),
+        _action(
+            "xcode_build",
+            "medium",
+            _xcode_params(),
+            "Run xcodebuild build.",
+        ),
+        _action(
+            "xcode_test",
+            "medium",
+            _xcode_params(),
+            "Run xcodebuild test.",
+        ),
+        _action(
+            "xcode_clean",
+            "medium",
+            _xcode_params(),
+            "Run xcodebuild clean.",
+        ),
+        _action("xcode_last_errors", "low", {"limit": "integer optional"}, "Return recent xcodebuild errors."),
         _action(
             "pending_create",
             "low",
@@ -177,6 +236,17 @@ def _action(name: str, risk: str, params: dict[str, str], description: str) -> d
     }
 
 
+def _xcode_params() -> dict[str, str]:
+    return {
+        "project_path": "string optional",
+        "xcode_path": "string optional",
+        "scheme": "string optional",
+        "configuration": "string optional",
+        "destination": "string optional",
+        "confirm": "boolean optional",
+    }
+
+
 def _normalize_action(action: str) -> str:
     return action.strip().lower().replace("-", "_")
 
@@ -203,6 +273,13 @@ def _int(params: dict[str, Any], key: str, default: int = 0) -> int:
 
 def _remember(settings: Settings, params: dict[str, Any]) -> dict:
     return remember(settings, _str(params, "text"), _str(params, "tags", "xiaozhi,voice-memory"))
+
+
+def _app_close(settings: Settings, params: dict[str, Any]) -> dict:
+    pending_params = {"app_name": _str(params, "app_name")}
+    if not _bool(params, "confirm"):
+        return create_pending_action("app_close", pending_params, f"关闭 {pending_params['app_name']}")
+    return close_app(settings, pending_params["app_name"])
 
 
 def _open_cc_project(settings: Settings, params: dict[str, Any]) -> dict:
@@ -287,6 +364,42 @@ def _continue_cc(settings: Settings, params: dict[str, Any]) -> dict:
     return continue_cc(settings, session_id, True, allow_frontmost)
 
 
+def _cc_send_slash_command(settings: Settings, params: dict[str, Any]) -> dict:
+    pending_params = {
+        "command": _str(params, "command"),
+        "args": _str(params, "args"),
+        "session_id": _str(params, "session_id", "default"),
+        "allow_frontmost": _bool(params, "allow_frontmost", False),
+    }
+    if not _bool(params, "confirm"):
+        return create_pending_action("cc_send_slash_command", pending_params, f"发送命令 {pending_params['command']}")
+    return send_slash_command(
+        settings,
+        pending_params["command"],
+        pending_params["args"],
+        pending_params["session_id"],
+        True,
+        bool(pending_params["allow_frontmost"]),
+    )
+
+
+def _cc_switch_model(settings: Settings, params: dict[str, Any]) -> dict:
+    pending_params = {
+        "model": _str(params, "model"),
+        "session_id": _str(params, "session_id", "default"),
+        "allow_frontmost": _bool(params, "allow_frontmost", False),
+    }
+    if not _bool(params, "confirm"):
+        return create_pending_action("cc_switch_model", pending_params, f"切换模型到 {pending_params['model']}")
+    return switch_model(
+        settings,
+        pending_params["model"],
+        pending_params["session_id"],
+        True,
+        bool(pending_params["allow_frontmost"]),
+    )
+
+
 def _stop_cc(settings: Settings, params: dict[str, Any]) -> dict:
     session_id = _str(params, "session_id", "default")
     allow_frontmost = _bool(params, "allow_frontmost", False)
@@ -297,6 +410,19 @@ def _stop_cc(settings: Settings, params: dict[str, Any]) -> dict:
             "停止 Claude Code 会话",
         )
     return stop_cc(session_id, allow_frontmost)
+
+
+def _xcode_action(action_type: str, params: dict[str, Any], runner) -> dict:
+    pending_params = {
+        "project_path": _str(params, "project_path"),
+        "xcode_path": _str(params, "xcode_path"),
+        "scheme": _str(params, "scheme"),
+        "configuration": _str(params, "configuration"),
+        "destination": _str(params, "destination"),
+    }
+    if not _bool(params, "confirm"):
+        return create_pending_action(action_type, pending_params)
+    return runner(**pending_params)
 
 
 def _pending_create(settings: Settings, params: dict[str, Any]) -> dict:
@@ -310,6 +436,8 @@ def _pending_create(settings: Settings, params: dict[str, Any]) -> dict:
 
 _ACTION_HANDLERS: dict[str, ActionHandler] = {
     "remember": _remember,
+    "app_open": lambda settings, params: open_app(settings, _str(params, "app_name")),
+    "app_close": _app_close,
     "open_cc_project": _open_cc_project,
     "open_cc_project_named": _open_cc_project_named,
     "ask_cc": _ask_cc,
@@ -319,6 +447,8 @@ _ACTION_HANDLERS: dict[str, ActionHandler] = {
         _str(params, "session_id", "default"),
         _int(params, "max_chars"),
     ),
+    "cc_send_slash_command": _cc_send_slash_command,
+    "cc_switch_model": _cc_switch_model,
     "continue_cc": _continue_cc,
     "focus_cc": lambda settings, params: focus_cc(_str(params, "session_id", "default")),
     "stop_cc": _stop_cc,
@@ -327,6 +457,13 @@ _ACTION_HANDLERS: dict[str, ActionHandler] = {
         _str(params, "query"),
         _int(params, "limit", 5),
     ),
+    "create_note": lambda settings, params: create_note(
+        settings,
+        _str(params, "note_path"),
+        _str(params, "text"),
+        _bool(params, "overwrite", False),
+    ),
+    "open_note": lambda settings, params: open_note(settings, _str(params, "note_path")),
     "append_note": lambda settings, params: append_note(
         settings,
         _str(params, "note_path"),
@@ -346,6 +483,27 @@ _ACTION_HANDLERS: dict[str, ActionHandler] = {
     "list_projects": lambda settings, params: list_projects(settings),
     "resolve_project": lambda settings, params: resolve_project(settings, _str(params, "project")),
     "cleanup_sessions": lambda settings, params: cleanup_sessions(),
+    "xcode_open_project": lambda settings, params: open_xcode_project(
+        settings,
+        _str(params, "project_path"),
+        _str(params, "xcode_path"),
+    ),
+    "xcode_build": lambda settings, params: _xcode_action(
+        "xcode_build",
+        params,
+        lambda **kwargs: xcode_build(settings, **kwargs),
+    ),
+    "xcode_test": lambda settings, params: _xcode_action(
+        "xcode_test",
+        params,
+        lambda **kwargs: xcode_test(settings, **kwargs),
+    ),
+    "xcode_clean": lambda settings, params: _xcode_action(
+        "xcode_clean",
+        params,
+        lambda **kwargs: xcode_clean(settings, **kwargs),
+    ),
+    "xcode_last_errors": lambda settings, params: xcode_last_errors(_int(params, "limit", 20)),
     "pending_create": _pending_create,
     "pending_list": lambda settings, params: list_pending_actions(_str(params, "status", "pending")),
     "pending_confirm": lambda settings, params: confirm_pending_action(settings, _str(params, "action_id")),

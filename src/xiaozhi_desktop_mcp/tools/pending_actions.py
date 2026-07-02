@@ -28,6 +28,9 @@ ALLOWED_ACTION_TYPES = frozenset(
         "cc_switch_model",
         "desktop_ask_cc",
         "desktop_ask_cc_project",
+        "xcode_build",
+        "xcode_clean",
+        "xcode_test",
     }
 )
 
@@ -45,6 +48,9 @@ _ALLOWED_PARAM_KEYS: dict[str, frozenset[str]] = {
     "desktop_ask_cc_project": frozenset(
         {"project", "text", "session_id", "cli", "terminal", "open_if_needed", "allow_frontmost"}
     ),
+    "xcode_build": frozenset({"project_path", "xcode_path", "scheme", "configuration", "destination"}),
+    "xcode_clean": frozenset({"project_path", "xcode_path", "scheme", "configuration", "destination"}),
+    "xcode_test": frozenset({"project_path", "xcode_path", "scheme", "configuration", "destination"}),
 }
 
 
@@ -222,6 +228,22 @@ def _execute(settings: Settings, action: PendingAction) -> dict:
             bool(params.get("open_if_needed", True)),
             bool(params.get("allow_frontmost", False)),
         )
+    if action.action_type in {"xcode_build", "xcode_clean", "xcode_test"}:
+        from .xcode import xcode_build, xcode_clean, xcode_test
+
+        runner = {
+            "xcode_build": xcode_build,
+            "xcode_clean": xcode_clean,
+            "xcode_test": xcode_test,
+        }[action.action_type]
+        return runner(
+            settings,
+            str(params.get("project_path", "")),
+            str(params.get("xcode_path", "")),
+            str(params.get("scheme", "")),
+            str(params.get("configuration", "")),
+            str(params.get("destination", "")),
+        )
     return fail(f"unsupported pending action type: {action.action_type}")
 
 
@@ -281,4 +303,10 @@ def _default_title(action_type: str, params: dict[str, Any]) -> str:
         return "发送任务给 Claude Code"
     if action_type == "desktop_ask_cc_project":
         return f"发送任务到项目 {params.get('project', '')}"
+    if action_type == "xcode_build":
+        return "执行 Xcode build"
+    if action_type == "xcode_clean":
+        return "执行 Xcode clean"
+    if action_type == "xcode_test":
+        return "执行 Xcode test"
     return action_type

@@ -34,6 +34,8 @@ from .tools.diagnostics import (
 from .tools.obsidian import (
     append_daily_note as append_daily_note_impl,
     append_note as append_note_impl,
+    create_note as create_note_impl,
+    open_note as open_note_impl,
     recent_memories as recent_memories_impl,
     save_memory as save_memory_impl,
     search_notes as search_notes_impl,
@@ -59,6 +61,13 @@ from .tools.workflows import (
     remember as desktop_remember_impl,
     stop_cc as desktop_stop_cc_impl,
 )
+from .tools.xcode import (
+    open_xcode_project as xcode_open_project_impl,
+    xcode_build as xcode_build_impl,
+    xcode_clean as xcode_clean_impl,
+    xcode_last_errors as xcode_last_errors_impl,
+    xcode_test as xcode_test_impl,
+)
 
 # FastMCP 会把下面用 @mcp.tool 标记的函数暴露给小智/LLM 调用。
 mcp = FastMCP("Xiaozhi Desktop MCP")
@@ -71,6 +80,18 @@ settings = load_settings()
 def obsidian_save_memory(text: str, tags: str = "xiaozhi,voice-memory") -> dict:
     """当用户说“记一下/保存想法/写到 Obsidian”时调用，保存一条语音记忆。"""
     return save_memory_impl(settings, text, tags)
+
+
+@mcp.tool()
+def obsidian_create_note(note_path: str, text: str = "", overwrite: bool = False) -> dict:
+    """新建 Obsidian vault 内的 Markdown 笔记。"""
+    return create_note_impl(settings, note_path, text, overwrite)
+
+
+@mcp.tool()
+def obsidian_open_note(note_path: str) -> dict:
+    """打开 Obsidian vault 内的 Markdown 笔记。"""
+    return open_note_impl(settings, note_path)
 
 
 @mcp.tool()
@@ -181,15 +202,20 @@ def cc_focus_session(session_id: str = "default") -> dict:
 
 
 @mcp.tool()
-def cc_send_instruction(text: str, session_id: str = "default") -> dict:
+def cc_send_instruction(text: str, session_id: str = "default", allow_frontmost: bool = False) -> dict:
     """向已启动的受管 CLI 会话发送自然语言任务说明。"""
-    return cc_send_instruction_impl(settings, text, session_id)
+    return cc_send_instruction_impl(settings, text, session_id, allow_frontmost)
 
 
 @mcp.tool()
-def cc_send_decision(decision: str, session_id: str = "default", confirm: bool = False) -> dict:
+def cc_send_decision(
+    decision: str,
+    session_id: str = "default",
+    confirm: bool = False,
+    allow_frontmost: bool = False,
+) -> dict:
     """当 CLI 等待确认时发送 yes/no/cancel；默认允许，可通过配置改成确认或禁止。"""
-    return cc_send_decision_impl(settings, decision, session_id, confirm)
+    return cc_send_decision_impl(settings, decision, session_id, confirm, allow_frontmost)
 
 
 @mcp.tool()
@@ -198,21 +224,27 @@ def cc_send_slash_command(
     args: str = "",
     session_id: str = "default",
     confirm: bool = False,
+    allow_frontmost: bool = False,
 ) -> dict:
     """发送 /init、/compact、/model 等内部命令；默认允许，可通过配置收紧。"""
-    return cc_send_slash_command_impl(settings, command, args, session_id, confirm)
+    return cc_send_slash_command_impl(settings, command, args, session_id, confirm, allow_frontmost)
 
 
 @mcp.tool()
-def cc_switch_model(model: str, session_id: str = "default", confirm: bool = False) -> dict:
+def cc_switch_model(
+    model: str,
+    session_id: str = "default",
+    confirm: bool = False,
+    allow_frontmost: bool = False,
+) -> dict:
     """切换受管 Claude Code/Codex 会话模型；默认允许所有模型，可用配置收紧。"""
-    return cc_switch_model_impl(settings, model, session_id, confirm)
+    return cc_switch_model_impl(settings, model, session_id, confirm, allow_frontmost)
 
 
 @mcp.tool()
-def cc_stop_session(session_id: str = "default") -> dict:
+def cc_stop_session(session_id: str = "default", allow_frontmost: bool = False) -> dict:
     """停止受管 Claude Code/Codex CLI 会话，并关闭前台 Terminal 窗口。"""
-    return cc_stop_session_impl(session_id)
+    return cc_stop_session_impl(session_id, allow_frontmost)
 
 
 @mcp.tool()
@@ -271,9 +303,19 @@ def desktop_ask_cc_project(
     cli: str = "",
     terminal: str = "Terminal",
     open_if_needed: bool = True,
+    allow_frontmost: bool = False,
 ) -> dict:
     """按项目名/别名把任务交给 Claude Code/Codex。"""
-    return desktop_ask_cc_project_impl(settings, project, text, session_id, cli, terminal, open_if_needed)
+    return desktop_ask_cc_project_impl(
+        settings,
+        project,
+        text,
+        session_id,
+        cli,
+        terminal,
+        open_if_needed,
+        allow_frontmost,
+    )
 
 
 @mcp.tool()
@@ -284,9 +326,10 @@ def desktop_ask_cc(
     cli: str = "",
     terminal: str = "Terminal",
     open_if_needed: bool = True,
+    allow_frontmost: bool = False,
 ) -> dict:
     """语音友好入口：把一句自然语言任务交给 Claude Code/Codex。"""
-    return desktop_ask_cc_impl(settings, text, project_path, session_id, cli, terminal, open_if_needed)
+    return desktop_ask_cc_impl(settings, text, project_path, session_id, cli, terminal, open_if_needed, allow_frontmost)
 
 
 @mcp.tool()
@@ -296,9 +339,9 @@ def desktop_check_cc(session_id: str = "default", max_chars: int = 0) -> dict:
 
 
 @mcp.tool()
-def desktop_continue_cc(session_id: str = "default", confirm: bool = False) -> dict:
+def desktop_continue_cc(session_id: str = "default", confirm: bool = False, allow_frontmost: bool = False) -> dict:
     """语音友好入口：让 Claude Code/Codex 继续。"""
-    return desktop_continue_cc_impl(settings, session_id, confirm)
+    return desktop_continue_cc_impl(settings, session_id, confirm, allow_frontmost)
 
 
 @mcp.tool()
@@ -308,9 +351,57 @@ def desktop_focus_cc(session_id: str = "default") -> dict:
 
 
 @mcp.tool()
-def desktop_stop_cc(session_id: str = "default") -> dict:
+def desktop_stop_cc(session_id: str = "default", allow_frontmost: bool = False) -> dict:
     """语音友好入口：退出 Claude Code/Codex 并关闭窗口。"""
-    return desktop_stop_cc_impl(session_id)
+    return desktop_stop_cc_impl(session_id, allow_frontmost)
+
+
+@mcp.tool()
+def xcode_open_project(project_path: str = "", xcode_path: str = "") -> dict:
+    """打开白名单项目内的 .xcodeproj 或 .xcworkspace。"""
+    return xcode_open_project_impl(settings, project_path, xcode_path)
+
+
+@mcp.tool()
+def xcode_build(
+    project_path: str = "",
+    xcode_path: str = "",
+    scheme: str = "",
+    configuration: str = "",
+    destination: str = "",
+) -> dict:
+    """在白名单项目内执行 xcodebuild build。"""
+    return xcode_build_impl(settings, project_path, xcode_path, scheme, configuration, destination)
+
+
+@mcp.tool()
+def xcode_test(
+    project_path: str = "",
+    xcode_path: str = "",
+    scheme: str = "",
+    configuration: str = "",
+    destination: str = "",
+) -> dict:
+    """在白名单项目内执行 xcodebuild test。"""
+    return xcode_test_impl(settings, project_path, xcode_path, scheme, configuration, destination)
+
+
+@mcp.tool()
+def xcode_clean(
+    project_path: str = "",
+    xcode_path: str = "",
+    scheme: str = "",
+    configuration: str = "",
+    destination: str = "",
+) -> dict:
+    """在白名单项目内执行 xcodebuild clean。"""
+    return xcode_clean_impl(settings, project_path, xcode_path, scheme, configuration, destination)
+
+
+@mcp.tool()
+def xcode_last_errors(limit: int = 20) -> dict:
+    """读取最近一次 xcodebuild 输出中的错误线索。"""
+    return xcode_last_errors_impl(limit)
 
 
 @mcp.tool()

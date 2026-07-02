@@ -11,6 +11,10 @@
 - Added explicit `allow_frontmost` opt-in for clients that intentionally target the frontmost Terminal tab.
 - Added early pending-action parameter validation.
 - Added pytest and ruff configuration plus core safety tests.
+- Added API v1 and MCP actions for opening/closing allowlisted apps.
+- Added API v1 and MCP actions for Claude Code/Codex slash commands and model switching.
+- Added Obsidian note create/open actions with vault path safety.
+- Added Xcode project open, build, test, clean, and recent error summary actions constrained by `XCODE_ALLOWED_PROJECTS`.
 
 ## 1.0.0 - 2026-07-01
 

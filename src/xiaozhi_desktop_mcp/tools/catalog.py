@@ -13,6 +13,18 @@ def tool_catalog() -> dict:
             "api_v1_action": "remember",
         },
         {
+            "name": "app_open",
+            "risk": "low",
+            "use_when": "用户要打开 Xcode、Obsidian、浏览器或其他白名单 App。",
+            "api_v1_action": "app_open",
+        },
+        {
+            "name": "app_close",
+            "risk": "medium",
+            "use_when": "用户要关闭白名单 App。",
+            "api_v1_action": "app_close",
+        },
+        {
             "name": "desktop_ask_cc",
             "risk": "medium",
             "use_when": "用户要把任务交给 Claude Code/Codex。",
@@ -29,6 +41,18 @@ def tool_catalog() -> dict:
             "risk": "medium",
             "use_when": "用户明确让 cc 继续、同意、确认。",
             "api_v1_action": "continue_cc",
+        },
+        {
+            "name": "cc_send_slash_command",
+            "risk": "medium",
+            "use_when": "用户明确要发送 /init、/compact、/clear、/model 等 Claude Code 命令。",
+            "api_v1_action": "cc_send_slash_command",
+        },
+        {
+            "name": "cc_switch_model",
+            "risk": "medium",
+            "use_when": "用户要切换 Claude Code/Codex 模型。",
+            "api_v1_action": "cc_switch_model",
         },
         {
             "name": "desktop_open_cc_project",
@@ -77,6 +101,48 @@ def tool_catalog() -> dict:
             "risk": "low",
             "use_when": "用户要写入今天日记或每日笔记。",
             "api_v1_action": "append_daily_note",
+        },
+        {
+            "name": "obsidian_create_note",
+            "risk": "low",
+            "use_when": "用户要新建一篇 Obsidian 笔记。",
+            "api_v1_action": "create_note",
+        },
+        {
+            "name": "obsidian_open_note",
+            "risk": "low",
+            "use_when": "用户要打开某篇 Obsidian 笔记。",
+            "api_v1_action": "open_note",
+        },
+        {
+            "name": "xcode_open_project",
+            "risk": "low",
+            "use_when": "用户要打开 Xcode 项目或 workspace。",
+            "api_v1_action": "xcode_open_project",
+        },
+        {
+            "name": "xcode_build",
+            "risk": "medium",
+            "use_when": "用户要编译 Xcode 项目。",
+            "api_v1_action": "xcode_build",
+        },
+        {
+            "name": "xcode_test",
+            "risk": "medium",
+            "use_when": "用户要运行 Xcode 测试。",
+            "api_v1_action": "xcode_test",
+        },
+        {
+            "name": "xcode_clean",
+            "risk": "medium",
+            "use_when": "用户要清理 Xcode 构建。",
+            "api_v1_action": "xcode_clean",
+        },
+        {
+            "name": "xcode_last_errors",
+            "risk": "low",
+            "use_when": "用户要查看最近一次 Xcode 编译/测试错误。",
+            "api_v1_action": "xcode_last_errors",
         },
         {
             "name": "pending_action_create",

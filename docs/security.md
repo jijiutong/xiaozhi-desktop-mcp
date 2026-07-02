@@ -7,8 +7,10 @@
 These actions are enabled in the first version:
 
 - Append memories to the configured Obsidian vault.
+- Create or open notes inside the configured Obsidian vault.
 - Create pending cc/Codex task files.
 - Open applications listed in `ALLOWED_APPS`.
+- Open Xcode projects inside `XCODE_ALLOWED_PROJECTS`.
 
 All generated files are written inside configured directories.
 
@@ -20,6 +22,7 @@ These actions should create a pending action first or require explicit confirmat
 - Continue or stop a Claude Code/Codex session.
 - Close terminal windows or applications.
 - Switch models or send slash commands.
+- Run Xcode build, test, or clean.
 
 ## High Risk: Deny by Default
 
@@ -35,6 +38,7 @@ These actions should stay disabled unless a user explicitly opts in with strong 
 - Obsidian memories must stay inside `OBSIDIAN_VAULT`.
 - cc/Codex task files must stay inside `CC_TASKS_DIR`.
 - macOS app launching is limited by `ALLOWED_APPS`.
+- Xcode project operations must stay inside `XCODE_ALLOWED_PROJECTS`.
 
 ## HTTP Rules
 

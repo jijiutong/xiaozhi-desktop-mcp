@@ -87,15 +87,26 @@ open_cc_project
 open_cc_project_named
 ask_cc
 ask_cc_project
+cc_send_slash_command
+cc_switch_model
 check_cc
 continue_cc
 focus_cc
 stop_cc
 cleanup_sessions
+app_open
+app_close
 search_obsidian
 append_note
 append_daily_note
+create_note
+open_note
 recent_memories
+xcode_open_project
+xcode_build
+xcode_test
+xcode_clean
+xcode_last_errors
 health
 config_summary
 tool_catalog
@@ -107,7 +118,7 @@ pending_cancel
 
 Use `GET /api/v1/actions` for machine-readable parameters and risk levels.
 
-Medium-risk actions such as `ask_cc`, `ask_cc_project`, `continue_cc`, and `stop_cc` create a pending action by default. Pass `"confirm": true` only when the client has already received explicit user confirmation.
+Medium-risk actions such as `ask_cc`, `ask_cc_project`, `continue_cc`, `stop_cc`, `app_close`, `cc_send_slash_command`, `cc_switch_model`, `xcode_build`, `xcode_test`, and `xcode_clean` create a pending action by default. Pass `"confirm": true` only when the client has already received explicit user confirmation.
 
 Claude Code/Codex send, continue, and stop actions require a registered session by default. A client may pass `"allow_frontmost": true` only when the user explicitly wants to target the frontmost Terminal tab.
 
@@ -117,6 +128,7 @@ Claude Code/Codex send, continue, and stop actions require a registered session 
 - Project actions are constrained by `CC_ALLOWED_PROJECTS`.
 - App actions are constrained by `ALLOWED_APPS`.
 - Obsidian actions are constrained by `OBSIDIAN_VAULT`.
+- Xcode actions are constrained by `XCODE_ALLOWED_PROJECTS`.
 - Medium-risk API v1 actions are routed through pending actions unless `confirm=true` is supplied.
 
 See [security.md](security.md) for more detail.

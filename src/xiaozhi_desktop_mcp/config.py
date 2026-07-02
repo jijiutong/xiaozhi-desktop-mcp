@@ -27,6 +27,7 @@ class Settings:
     cc_default_cli: str
     cc_allowed_cli_args: frozenset[str]
     cc_visible_terminals: frozenset[str]
+    xcode_allowed_projects: frozenset[Path]
     cc_allowed_models: frozenset[str]
     cc_slash_default_policy: str
     cc_slash_allow: frozenset[str]
@@ -94,6 +95,7 @@ def load_settings() -> Settings:
     cc_default_cli = os.getenv("CC_DEFAULT_CLI", "claude").strip() or "claude"
     cc_allowed_cli_args = _split_csv(os.getenv("CC_ALLOWED_CLI_ARGS", "-c,--continue"))
     cc_visible_terminals = _split_csv(os.getenv("CC_VISIBLE_TERMINALS", "Terminal,iTerm"))
+    xcode_allowed_projects = _split_paths(os.getenv("XCODE_ALLOWED_PROJECTS", allowed_projects_value))
     cc_allowed_models = _split_csv(os.getenv("CC_ALLOWED_MODELS", ""))
     cc_slash_default_policy = os.getenv("CC_SLASH_DEFAULT_POLICY", "allow").strip().lower()
     cc_slash_allow = _split_csv(os.getenv("CC_SLASH_ALLOW", ""))
@@ -113,6 +115,7 @@ def load_settings() -> Settings:
         cc_default_cli=cc_default_cli,
         cc_allowed_cli_args=cc_allowed_cli_args,
         cc_visible_terminals=cc_visible_terminals,
+        xcode_allowed_projects=xcode_allowed_projects,
         cc_allowed_models=cc_allowed_models,
         cc_slash_default_policy=cc_slash_default_policy,
         cc_slash_allow=cc_slash_allow,

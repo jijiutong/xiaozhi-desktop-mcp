@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from xiaozhi_desktop_mcp.tools.obsidian import search_notes
+from xiaozhi_desktop_mcp.tools.obsidian import create_note, search_notes
 
 
 def test_search_notes_skips_symlinks(settings, tmp_path):
@@ -14,3 +14,11 @@ def test_search_notes_skips_symlinks(settings, tmp_path):
 
     assert result["success"] is True
     assert [item["relative_path"] for item in result["results"]] == ["inside.md"]
+
+
+def test_create_note_stays_inside_vault(settings):
+    result = create_note(settings, "ideas/today", "hello")
+
+    assert result["success"] is True
+    target = settings.obsidian_vault / "ideas" / "today.md"
+    assert target.read_text(encoding="utf-8") == "hello\n"

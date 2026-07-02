@@ -34,6 +34,7 @@ def settings(tmp_path: Path) -> Settings:
         cc_default_cli="claude",
         cc_allowed_cli_args=frozenset({"-c", "--continue"}),
         cc_visible_terminals=frozenset({"Terminal"}),
+        xcode_allowed_projects=frozenset({project}),
         cc_allowed_models=frozenset(),
         cc_slash_default_policy="allow",
         cc_slash_allow=frozenset(),

@@ -48,10 +48,11 @@ Xiaozhi Desktop MCP 把这些约束编码成一套稳定接口：
 | --- | --- |
 | API v1 | `GET /api/v1/actions`、`GET /api/v1/health`、`POST /api/v1/dispatch` |
 | 多语言接入 | Java、Python、Go 或任意 HTTP 客户端 |
-| Obsidian | 保存记忆、追加笔记、每日笔记、搜索、读取最近记忆 |
-| Claude Code / Codex | 打开项目、发送任务、查看状态、继续、聚焦、停止、切模型 |
+| Obsidian | 保存记忆、新建/打开/追加笔记、每日笔记、搜索、读取最近记忆 |
+| Claude Code / Codex | 打开项目、发送任务、slash 命令、切模型、查看状态、继续、聚焦、停止 |
 | 项目别名 | 从 `CC_ALLOWED_PROJECTS` 生成安全项目目录 |
 | App 控制 | 打开或关闭 `ALLOWED_APPS` 白名单内的 macOS App |
+| Xcode | 打开项目、build、test、clean、查看最近错误摘要 |
 | 待确认动作 | 中风险动作先入队，确认后执行 |
 | 自检与目录 | 环境自检、配置摘要、工具目录、会话清理 |
 
@@ -72,6 +73,7 @@ cp .env.example .env
 OBSIDIAN_VAULT=/path/to/your/obsidian-vault
 DEFAULT_PROJECT_ROOT=/path/to/your/project
 CC_ALLOWED_PROJECTS=/path/to/your/project
+XCODE_ALLOWED_PROJECTS=/path/to/your/project
 ALLOWED_APPS=Obsidian,Terminal,Google Chrome
 ```
 
@@ -229,11 +231,22 @@ func main() {
 | 保存一条记忆 | `remember` |
 | 列出允许项目 | `list_projects` |
 | 按项目名交给 Claude Code | `ask_cc_project` |
+| 给 Claude Code 发 slash 命令 | `cc_send_slash_command` |
+| 切换 Claude Code 模型 | `cc_switch_model` |
 | 查看 Claude Code 状态 | `check_cc` |
 | 让 Claude Code 继续 | `continue_cc` |
 | 停止 Claude Code | `stop_cc` |
+| 打开 App | `app_open` |
+| 关闭 App | `app_close` |
 | 搜索 Obsidian | `search_obsidian` |
+| 新建 Obsidian 笔记 | `create_note` |
+| 打开 Obsidian 笔记 | `open_note` |
 | 写入每日笔记 | `append_daily_note` |
+| 打开 Xcode 项目 | `xcode_open_project` |
+| Xcode 构建 | `xcode_build` |
+| Xcode 测试 | `xcode_test` |
+| Xcode 清理 | `xcode_clean` |
+| 查看 Xcode 最近错误 | `xcode_last_errors` |
 | 创建待确认动作 | `pending_create` |
 | 确认待执行动作 | `pending_confirm` |
 | 桌面环境自检 | `health` |
@@ -251,9 +264,11 @@ curl http://127.0.0.1:8765/api/v1/actions
 小智，记一下：这个项目先做成桌面 MCP。
 小智，打开这个项目的 Claude Code。
 小智，把这个任务交给 cc：检查 README 是否清楚。
+小智，让 cc 执行 /status。
 小智，看看 cc 现在卡在哪。
 小智，搜索 Obsidian 里关于桌面 MCP 的笔记。
-小智，创建一个待确认动作，让 cc 继续。
+小智，打开 Xcode 项目并构建。
+小智，创建一篇 Obsidian 笔记，标题是今天的想法。
 ```
 
 ## 安全边界
@@ -263,6 +278,7 @@ curl http://127.0.0.1:8765/api/v1/actions
 | 任意 shell | 不提供 |
 | App | 只能操作 `ALLOWED_APPS` |
 | 项目 | 只能进入 `CC_ALLOWED_PROJECTS` |
+| Xcode | 只能操作 `XCODE_ALLOWED_PROJECTS` |
 | Obsidian | 只能访问 `OBSIDIAN_VAULT` |
 | 中风险动作 | API v1 默认创建 pending action，`confirm=true` 才直接执行 |
 | 会话状态 | 仅保存进程内状态，重启清空 |

@@ -41,3 +41,9 @@ These actions should stay disabled unless a user explicitly opts in with strong 
 - Localhost mode can run without a token for personal desktop use.
 - Non-localhost HTTP binding requires `DESKTOP_MCP_AUTH_TOKEN`.
 - Protected `/api/...` routes accept `Authorization: Bearer <token>` or `X-Desktop-Mcp-Token`.
+
+## Terminal Targeting
+
+- Claude Code/Codex send, continue, slash, model, and stop operations target registered sessions by default.
+- Frontmost Terminal fallback is disabled unless a client explicitly passes `allow_frontmost=true`.
+- Pending actions validate required parameters before they are created.

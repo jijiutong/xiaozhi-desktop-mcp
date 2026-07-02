@@ -109,6 +109,8 @@ Use `GET /api/v1/actions` for machine-readable parameters and risk levels.
 
 Medium-risk actions such as `ask_cc`, `ask_cc_project`, `continue_cc`, and `stop_cc` create a pending action by default. Pass `"confirm": true` only when the client has already received explicit user confirmation.
 
+Claude Code/Codex send, continue, and stop actions require a registered session by default. A client may pass `"allow_frontmost": true` only when the user explicitly wants to target the frontmost Terminal tab.
+
 ## Safety Model
 
 - No arbitrary shell command action exists.

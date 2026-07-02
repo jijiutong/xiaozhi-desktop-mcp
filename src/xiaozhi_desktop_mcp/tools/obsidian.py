@@ -7,7 +7,6 @@ from ..config import Settings
 from ..responses import fail, ok
 from ..safety import SafetyError, ensure_inside
 
-
 _MAX_SEARCH_RESULTS = 10
 _MAX_SNIPPET_CHARS = 240
 _MAX_RECENT_CHARS = 4000

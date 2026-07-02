@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..config import Settings
-from ..responses import fail, ok
+from ..responses import fail
 from .cc_session import (
     focus_session,
     open_visible_session,
@@ -42,6 +42,7 @@ def ask_cc(
     cli: str = "",
     terminal: str = "Terminal",
     open_if_needed: bool = True,
+    allow_frontmost: bool = False,
 ) -> dict:
     """Send an instruction to Claude Code; open a visible session first if requested."""
     instruction = text.strip()
@@ -57,7 +58,7 @@ def ask_cc(
                 opened["workflow"] = "desktop_ask_cc"
                 return opened
 
-    sent = send_instruction(settings, instruction, session_id)
+    sent = send_instruction(settings, instruction, session_id, allow_frontmost)
     sent["workflow"] = "desktop_ask_cc"
     if sent.get("success"):
         sent["opened_session"] = bool(opened and opened.get("success"))
@@ -72,9 +73,14 @@ def check_cc(settings: Settings, session_id: str = "default", max_chars: int = 0
     return result
 
 
-def continue_cc(settings: Settings, session_id: str = "default", confirm: bool = False) -> dict:
+def continue_cc(
+    settings: Settings,
+    session_id: str = "default",
+    confirm: bool = False,
+    allow_frontmost: bool = False,
+) -> dict:
     """Voice-friendly wrapper for sending yes/continue to Claude Code."""
-    result = send_decision(settings, "yes", session_id, confirm)
+    result = send_decision(settings, "yes", session_id, confirm, allow_frontmost)
     result["workflow"] = "desktop_continue_cc"
     if result.get("success"):
         result["spoken_message"] = "已让 Claude Code 继续。"
@@ -88,8 +94,8 @@ def focus_cc(session_id: str = "default") -> dict:
     return result
 
 
-def stop_cc(session_id: str = "default") -> dict:
+def stop_cc(session_id: str = "default", allow_frontmost: bool = False) -> dict:
     """Voice-friendly wrapper for stopping a visible Claude Code session."""
-    result = stop_session(session_id)
+    result = stop_session(session_id, allow_frontmost)
     result["workflow"] = "desktop_stop_cc"
     return result

@@ -17,7 +17,6 @@ from .cc_session import (
     switch_model,
 )
 
-
 ALLOWED_ACTION_TYPES = frozenset(
     {
         "app_close",
@@ -31,6 +30,22 @@ ALLOWED_ACTION_TYPES = frozenset(
         "desktop_ask_cc_project",
     }
 )
+
+_ALLOWED_PARAM_KEYS: dict[str, frozenset[str]] = {
+    "app_close": frozenset({"app_name"}),
+    "cc_close_terminal": frozenset({"terminal"}),
+    "cc_continue": frozenset({"session_id", "allow_frontmost"}),
+    "cc_send_instruction": frozenset({"text", "session_id", "allow_frontmost"}),
+    "cc_send_slash_command": frozenset({"command", "args", "session_id", "allow_frontmost"}),
+    "cc_stop": frozenset({"session_id", "allow_frontmost"}),
+    "cc_switch_model": frozenset({"model", "session_id", "allow_frontmost"}),
+    "desktop_ask_cc": frozenset(
+        {"text", "project_path", "session_id", "cli", "terminal", "open_if_needed", "allow_frontmost"}
+    ),
+    "desktop_ask_cc_project": frozenset(
+        {"project", "text", "session_id", "cli", "terminal", "open_if_needed", "allow_frontmost"}
+    ),
+}
 
 
 @dataclass
@@ -57,8 +72,11 @@ def create_pending_action(action_type: str, params: dict | None = None, title: s
             f"pending action type is not allowlisted: {normalized}. allowed: {allowed}",
             "这个待确认动作类型不在白名单里，我没有创建。",
         )
-    action_id = uuid4().hex[:12]
     clean_params = dict(params or {})
+    validation_error = _validate_params(normalized, clean_params)
+    if validation_error:
+        return fail(validation_error, "待确认动作参数不完整或格式不对，我没有创建。")
+    action_id = uuid4().hex[:12]
     clean_title = title.strip() or _default_title(normalized, clean_params)
     action = PendingAction(
         action_id=action_id,
@@ -145,9 +163,20 @@ def _execute(settings: Settings, action: PendingAction) -> dict:
     if action.action_type == "cc_close_terminal":
         return close_terminal(str(params.get("terminal", "Terminal")))
     if action.action_type == "cc_continue":
-        return send_decision(settings, "yes", str(params.get("session_id", "default")), True)
+        return send_decision(
+            settings,
+            "yes",
+            str(params.get("session_id", "default")),
+            True,
+            bool(params.get("allow_frontmost", False)),
+        )
     if action.action_type == "cc_send_instruction":
-        return send_instruction(settings, str(params.get("text", "")), str(params.get("session_id", "default")))
+        return send_instruction(
+            settings,
+            str(params.get("text", "")),
+            str(params.get("session_id", "default")),
+            bool(params.get("allow_frontmost", False)),
+        )
     if action.action_type == "cc_send_slash_command":
         return send_slash_command(
             settings,
@@ -155,15 +184,17 @@ def _execute(settings: Settings, action: PendingAction) -> dict:
             str(params.get("args", "")),
             str(params.get("session_id", "default")),
             True,
+            bool(params.get("allow_frontmost", False)),
         )
     if action.action_type == "cc_stop":
-        return stop_session(str(params.get("session_id", "default")))
+        return stop_session(str(params.get("session_id", "default")), bool(params.get("allow_frontmost", False)))
     if action.action_type == "cc_switch_model":
         return switch_model(
             settings,
             str(params.get("model", "")),
             str(params.get("session_id", "default")),
             True,
+            bool(params.get("allow_frontmost", False)),
         )
     if action.action_type == "desktop_ask_cc":
         from .workflows import ask_cc
@@ -176,6 +207,7 @@ def _execute(settings: Settings, action: PendingAction) -> dict:
             str(params.get("cli", "")),
             str(params.get("terminal", "Terminal")),
             bool(params.get("open_if_needed", True)),
+            bool(params.get("allow_frontmost", False)),
         )
     if action.action_type == "desktop_ask_cc_project":
         from .projects import ask_cc_project
@@ -188,6 +220,7 @@ def _execute(settings: Settings, action: PendingAction) -> dict:
             str(params.get("cli", "")),
             str(params.get("terminal", "Terminal")),
             bool(params.get("open_if_needed", True)),
+            bool(params.get("allow_frontmost", False)),
         )
     return fail(f"unsupported pending action type: {action.action_type}")
 
@@ -206,6 +239,27 @@ def _serialize(action: PendingAction) -> dict:
     if action.result is not None:
         result["result"] = action.result
     return result
+
+
+def _validate_params(action_type: str, params: dict[str, Any]) -> str:
+    allowed_keys = _ALLOWED_PARAM_KEYS.get(action_type, frozenset())
+    unknown_keys = sorted(set(params) - allowed_keys)
+    if unknown_keys:
+        return f"unknown params for {action_type}: {', '.join(unknown_keys)}"
+    required_fields = {
+        "app_close": ("app_name",),
+        "cc_send_instruction": ("text",),
+        "cc_send_slash_command": ("command",),
+        "cc_switch_model": ("model",),
+        "desktop_ask_cc": ("text",),
+        "desktop_ask_cc_project": ("project", "text"),
+    }.get(action_type, ())
+    for field_name in required_fields:
+        if not str(params.get(field_name, "")).strip():
+            return f"missing required param for {action_type}: {field_name}"
+    if action_type == "cc_send_slash_command" and not str(params.get("command", "")).strip().startswith("/"):
+        return "slash command must start with /"
+    return ""
 
 
 def _default_title(action_type: str, params: dict[str, Any]) -> str:

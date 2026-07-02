@@ -10,11 +10,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from .api_v1 import actions_catalog as api_v1_actions_catalog
-from .api_v1 import api_health as api_v1_health
-from .api_v1 import dispatch as api_v1_dispatch
+from .api_v1 import actions_catalog as api_v1_actions_catalog, api_health as api_v1_health, dispatch as api_v1_dispatch
 from .config import load_settings
-
 
 app = FastAPI(title="Xiaozhi Desktop MCP HTTP Adapter")
 settings = load_settings()

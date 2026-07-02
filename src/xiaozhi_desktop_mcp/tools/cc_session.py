@@ -14,7 +14,6 @@ from ..config import Settings
 from ..responses import fail, ok
 from ..safety import SafetyError, ensure_allowed_cli, ensure_allowed_project, slash_policy
 
-
 # 第一版只做进程内受管 session，不写日志、不做摘要。
 _MAX_BUFFER_CHARS = 200_000
 
@@ -208,7 +207,7 @@ def session_status(settings: Settings, session_id: str = "default", max_chars: i
         return fail(str(exc), "我没能读取 Claude Code 当前状态。")
 
 
-def send_instruction(settings: Settings, text: str, session_id: str = "default") -> dict:
+def send_instruction(settings: Settings, text: str, session_id: str = "default", allow_frontmost: bool = False) -> dict:
     """向可见终端中的 Claude Code/Codex 会话发送一段自然语言指令。"""
     try:
         session_id = _normalize_session_id(session_id)
@@ -216,12 +215,13 @@ def send_instruction(settings: Settings, text: str, session_id: str = "default")
         terminal = visible_session.terminal if visible_session else "Terminal"
         if not text.strip():
             raise SafetyError("instruction is empty")
+        if not visible_session and not allow_frontmost:
+            raise SafetyError(f"visible session is not registered: {session_id}")
         if visible_session:
             _send_to_visible_session(visible_session, text.strip())
+            visible_session.last_activity_at = datetime.now()
         else:
             _send_to_visible_terminal(terminal, text.strip())
-        if visible_session:
-            visible_session.last_activity_at = datetime.now()
         return ok(
             {
                 "session_id": session_id,
@@ -241,6 +241,7 @@ def send_decision(
     decision: str,
     session_id: str = "default",
     confirm: bool = False,
+    allow_frontmost: bool = False,
 ) -> dict:
     """发送 yes/no/cancel 决策；策略默认允许，也可用配置收紧。"""
     try:
@@ -278,12 +279,13 @@ def send_decision(
                 {"policy": policy, "decision": value},
             )
 
+        if not visible_session and not allow_frontmost:
+            raise SafetyError(f"visible session is not registered: {session_id}")
         if visible_session:
             _send_to_visible_session(visible_session, value)
+            visible_session.last_activity_at = datetime.now()
         else:
             _send_to_visible_terminal(terminal, value)
-        if visible_session:
-            visible_session.last_activity_at = datetime.now()
         spoken = {"yes": "已发送同意。", "no": "已发送拒绝。", "cancel": "已发送取消。"}[value]
         return ok(
             {
@@ -307,6 +309,7 @@ def send_slash_command(
     args: str = "",
     session_id: str = "default",
     confirm: bool = False,
+    allow_frontmost: bool = False,
 ) -> dict:
     """发送 Claude Code/Codex 内部 slash 命令，例如 /init、/compact、/model。"""
     try:
@@ -336,12 +339,13 @@ def send_slash_command(
                 {"policy": policy, "command": slash},
             )
 
+        if not visible_session and not allow_frontmost:
+            raise SafetyError(f"visible session is not registered: {session_id}")
         if visible_session:
             _send_to_visible_session(visible_session, slash)
+            visible_session.last_activity_at = datetime.now()
         else:
             _send_to_visible_terminal(terminal, slash)
-        if visible_session:
-            visible_session.last_activity_at = datetime.now()
         return ok(
             {
                 "policy": policy,
@@ -363,6 +367,7 @@ def switch_model(
     model: str,
     session_id: str = "default",
     confirm: bool = False,
+    allow_frontmost: bool = False,
 ) -> dict:
     """切换 Claude Code/Codex 模型，底层发送 `/model <model>`。
 
@@ -371,7 +376,7 @@ def switch_model(
     """
     try:
         model_name = _ensure_allowed_model(model, settings.cc_allowed_models)
-        return send_slash_command(settings, "/model", model_name, session_id, confirm)
+        return send_slash_command(settings, "/model", model_name, session_id, confirm, allow_frontmost)
     except SafetyError as exc:
         return fail(str(exc), "模型没有切换成功。")
 
@@ -398,12 +403,14 @@ def focus_session(session_id: str = "default") -> dict:
         return fail(str(exc), "我没能找到并聚焦这个 Claude Code 会话。")
 
 
-def stop_session(session_id: str = "default") -> dict:
+def stop_session(session_id: str = "default", allow_frontmost: bool = False) -> dict:
     """退出可见 Terminal 里的 Claude Code/Codex，并关闭前台 Terminal 窗口。"""
     try:
         session_id = _normalize_session_id(session_id)
         visible_session = _visible_sessions.get(session_id)
         terminal = visible_session.terminal if visible_session else "Terminal"
+        if not visible_session and not allow_frontmost:
+            raise SafetyError(f"visible session is not registered: {session_id}")
         if visible_session:
             _send_to_visible_session(visible_session, "/exit")
         else:
@@ -935,7 +942,9 @@ def _status_summary(status: str, tail: str) -> str:
     if status == "waiting_confirmation":
         return "Claude Code 正在等待确认。"
     if status == "error":
-        return f"Claude Code 的输出看起来有错误。最后一行是：{last_line}" if last_line else "Claude Code 的输出看起来有错误。"
+        if last_line:
+            return f"Claude Code 的输出看起来有错误。最后一行是：{last_line}"
+        return "Claude Code 的输出看起来有错误。"
     if status == "done":
         return f"Claude Code 看起来已经完成。最后一行是：{last_line}" if last_line else "Claude Code 看起来已经完成。"
     if status == "running":
@@ -955,4 +964,6 @@ def _decision_policy(decision: str, settings: Settings) -> str:
         return "deny"
     if key in settings.cc_slash_confirm:
         return "confirm"
-    return settings.cc_slash_default_policy if settings.cc_slash_default_policy in {"allow", "confirm", "deny"} else "allow"
+    if settings.cc_slash_default_policy in {"allow", "confirm", "deny"}:
+        return settings.cc_slash_default_policy
+    return "allow"

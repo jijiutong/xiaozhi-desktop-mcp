@@ -61,13 +61,14 @@ def ask_cc_project(
     cli: str = "",
     terminal: str = "Terminal",
     open_if_needed: bool = True,
+    allow_frontmost: bool = False,
 ) -> dict:
     """Resolve a project name/path, then send an instruction to Claude Code/Codex."""
     try:
         path = _resolve_project_path(settings, project)
     except SafetyError as exc:
         return fail(str(exc), "我没有找到这个允许项目，所以没有发送给 Claude Code。")
-    result = ask_cc(settings, text, str(path), session_id, cli, terminal, open_if_needed)
+    result = ask_cc(settings, text, str(path), session_id, cli, terminal, open_if_needed, allow_frontmost)
     result["project_alias"] = project
     result["resolved_project_path"] = str(path)
     return result

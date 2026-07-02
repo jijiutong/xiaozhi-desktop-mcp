@@ -88,6 +88,8 @@ The service creates directories when writing. A missing inbox directory is a war
 
 ```bash
 .venv/bin/python -m compileall -f src
+.venv/bin/python -m pytest
+.venv/bin/python -m ruff check .
 ```
 
 Useful smoke tests:

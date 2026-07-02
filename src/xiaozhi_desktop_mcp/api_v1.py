@@ -9,7 +9,7 @@ from .responses import fail, ok
 from .tools.catalog import tool_catalog
 from .tools.cc_session import cleanup_sessions
 from .tools.diagnostics import config_summary, health_detail
-from .tools.obsidian import append_daily_note, append_note, recent_memories, save_memory, search_notes
+from .tools.obsidian import append_daily_note, append_note, recent_memories, search_notes
 from .tools.pending_actions import (
     cancel_pending_action,
     confirm_pending_action,
@@ -26,7 +26,6 @@ from .tools.workflows import (
     remember,
     stop_cc,
 )
-
 
 ActionHandler = Callable[[Settings, dict[str, Any]], dict]
 logger = logging.getLogger(__name__)
@@ -57,16 +56,69 @@ def actions_catalog() -> dict:
     """Return machine-friendly action definitions for API clients."""
     actions = [
         _action("remember", "low", {"text": "string", "tags": "string optional"}, "Save memory to Obsidian."),
-        _action("open_cc_project", "low", {"project_path": "string optional", "session_id": "string optional"}, "Open Claude Code/Codex by path."),
-        _action("open_cc_project_named", "low", {"project": "string", "session_id": "string optional"}, "Open Claude Code/Codex by project alias."),
-        _action("ask_cc", "medium", {"text": "string", "project_path": "string optional", "confirm": "boolean optional"}, "Send instruction to Claude Code/Codex."),
-        _action("ask_cc_project", "medium", {"project": "string", "text": "string", "confirm": "boolean optional"}, "Send instruction by project alias."),
+        _action(
+            "open_cc_project",
+            "low",
+            {"project_path": "string optional", "session_id": "string optional"},
+            "Open Claude Code/Codex by path.",
+        ),
+        _action(
+            "open_cc_project_named",
+            "low",
+            {"project": "string", "session_id": "string optional"},
+            "Open Claude Code/Codex by project alias.",
+        ),
+        _action(
+            "ask_cc",
+            "medium",
+            {
+                "text": "string",
+                "project_path": "string optional",
+                "confirm": "boolean optional",
+                "allow_frontmost": "boolean optional",
+            },
+            "Send instruction to Claude Code/Codex.",
+        ),
+        _action(
+            "ask_cc_project",
+            "medium",
+            {
+                "project": "string",
+                "text": "string",
+                "confirm": "boolean optional",
+                "allow_frontmost": "boolean optional",
+            },
+            "Send instruction by project alias.",
+        ),
         _action("check_cc", "low", {"session_id": "string optional"}, "Check Claude Code/Codex status."),
-        _action("continue_cc", "medium", {"session_id": "string optional", "confirm": "boolean optional"}, "Send yes/continue."),
+        _action(
+            "continue_cc",
+            "medium",
+            {
+                "session_id": "string optional",
+                "confirm": "boolean optional",
+                "allow_frontmost": "boolean optional",
+            },
+            "Send yes/continue.",
+        ),
         _action("focus_cc", "low", {"session_id": "string optional"}, "Focus Claude Code/Codex window."),
-        _action("stop_cc", "medium", {"session_id": "string optional"}, "Stop Claude Code/Codex session."),
+        _action(
+            "stop_cc",
+            "medium",
+            {
+                "session_id": "string optional",
+                "confirm": "boolean optional",
+                "allow_frontmost": "boolean optional",
+            },
+            "Stop Claude Code/Codex session.",
+        ),
         _action("search_obsidian", "low", {"query": "string", "limit": "integer optional"}, "Search Obsidian notes."),
-        _action("append_note", "low", {"note_path": "string", "text": "string"}, "Append a note inside Obsidian vault."),
+        _action(
+            "append_note",
+            "low",
+            {"note_path": "string", "text": "string"},
+            "Append a note inside Obsidian vault.",
+        ),
         _action("append_daily_note", "low", {"text": "string", "date": "YYYY-MM-DD optional"}, "Append daily note."),
         _action("recent_memories", "low", {"limit": "integer optional"}, "Read recent voice memories."),
         _action("health", "low", {}, "Run desktop MCP health checks."),
@@ -75,7 +127,12 @@ def actions_catalog() -> dict:
         _action("list_projects", "low", {}, "List allowed projects."),
         _action("resolve_project", "low", {"project": "string"}, "Resolve project alias/path."),
         _action("cleanup_sessions", "low", {}, "Clean stale Claude Code/Codex session registrations."),
-        _action("pending_create", "low", {"action_type": "string", "params": "object optional"}, "Create pending action."),
+        _action(
+            "pending_create",
+            "low",
+            {"action_type": "string", "params": "object optional"},
+            "Create pending action.",
+        ),
         _action("pending_list", "low", {"status": "string optional"}, "List pending actions."),
         _action("pending_confirm", "medium", {"action_id": "string"}, "Confirm pending action."),
         _action("pending_cancel", "low", {"action_id": "string"}, "Cancel pending action."),
@@ -95,7 +152,11 @@ def api_health(settings: Settings) -> dict:
 
 def _envelope(action: str, result: dict, request_id: str) -> dict:
     success = bool(result.get("success"))
-    data = {key: value for key, value in result.items() if key not in {"success", "spoken_message", "error_spoken_message", "error"}}
+    data = {
+        key: value
+        for key, value in result.items()
+        if key not in {"success", "spoken_message", "error_spoken_message", "error"}
+    }
     return {
         "success": success,
         "request_id": request_id,
@@ -174,6 +235,7 @@ def _ask_cc(settings: Settings, params: dict[str, Any]) -> dict:
         "cli": _str(params, "cli"),
         "terminal": _str(params, "terminal", "Terminal"),
         "open_if_needed": _bool(params, "open_if_needed", True),
+        "allow_frontmost": _bool(params, "allow_frontmost", False),
     }
     if not _bool(params, "confirm"):
         return create_pending_action("desktop_ask_cc", pending_params, "发送任务给 Claude Code")
@@ -185,6 +247,7 @@ def _ask_cc(settings: Settings, params: dict[str, Any]) -> dict:
         pending_params["cli"],
         pending_params["terminal"],
         bool(pending_params["open_if_needed"]),
+        bool(pending_params["allow_frontmost"]),
     )
 
 
@@ -196,6 +259,7 @@ def _ask_cc_project(settings: Settings, params: dict[str, Any]) -> dict:
         "cli": _str(params, "cli"),
         "terminal": _str(params, "terminal", "Terminal"),
         "open_if_needed": _bool(params, "open_if_needed", True),
+        "allow_frontmost": _bool(params, "allow_frontmost", False),
     }
     if not _bool(params, "confirm"):
         return create_pending_action("desktop_ask_cc_project", pending_params, "按项目发送任务给 Claude Code")
@@ -207,26 +271,41 @@ def _ask_cc_project(settings: Settings, params: dict[str, Any]) -> dict:
         pending_params["cli"],
         pending_params["terminal"],
         bool(pending_params["open_if_needed"]),
+        bool(pending_params["allow_frontmost"]),
     )
 
 
 def _continue_cc(settings: Settings, params: dict[str, Any]) -> dict:
     session_id = _str(params, "session_id", "default")
+    allow_frontmost = _bool(params, "allow_frontmost", False)
     if not _bool(params, "confirm"):
-        return create_pending_action("cc_continue", {"session_id": session_id}, "让 Claude Code 继续")
-    return continue_cc(settings, session_id, True)
+        return create_pending_action(
+            "cc_continue",
+            {"session_id": session_id, "allow_frontmost": allow_frontmost},
+            "让 Claude Code 继续",
+        )
+    return continue_cc(settings, session_id, True, allow_frontmost)
 
 
 def _stop_cc(settings: Settings, params: dict[str, Any]) -> dict:
     session_id = _str(params, "session_id", "default")
+    allow_frontmost = _bool(params, "allow_frontmost", False)
     if not _bool(params, "confirm"):
-        return create_pending_action("cc_stop", {"session_id": session_id}, "停止 Claude Code 会话")
-    return stop_cc(session_id)
+        return create_pending_action(
+            "cc_stop",
+            {"session_id": session_id, "allow_frontmost": allow_frontmost},
+            "停止 Claude Code 会话",
+        )
+    return stop_cc(session_id, allow_frontmost)
 
 
 def _pending_create(settings: Settings, params: dict[str, Any]) -> dict:
     pending_params = params.get("params", {})
-    return create_pending_action(_str(params, "action_type"), pending_params if isinstance(pending_params, dict) else {}, _str(params, "title"))
+    return create_pending_action(
+        _str(params, "action_type"),
+        pending_params if isinstance(pending_params, dict) else {},
+        _str(params, "title"),
+    )
 
 
 _ACTION_HANDLERS: dict[str, ActionHandler] = {
@@ -235,13 +314,31 @@ _ACTION_HANDLERS: dict[str, ActionHandler] = {
     "open_cc_project_named": _open_cc_project_named,
     "ask_cc": _ask_cc,
     "ask_cc_project": _ask_cc_project,
-    "check_cc": lambda settings, params: check_cc(settings, _str(params, "session_id", "default"), _int(params, "max_chars")),
+    "check_cc": lambda settings, params: check_cc(
+        settings,
+        _str(params, "session_id", "default"),
+        _int(params, "max_chars"),
+    ),
     "continue_cc": _continue_cc,
     "focus_cc": lambda settings, params: focus_cc(_str(params, "session_id", "default")),
     "stop_cc": _stop_cc,
-    "search_obsidian": lambda settings, params: search_notes(settings, _str(params, "query"), _int(params, "limit", 5)),
-    "append_note": lambda settings, params: append_note(settings, _str(params, "note_path"), _str(params, "text"), _str(params, "heading")),
-    "append_daily_note": lambda settings, params: append_daily_note(settings, _str(params, "text"), _str(params, "date"), _str(params, "folder", "daily")),
+    "search_obsidian": lambda settings, params: search_notes(
+        settings,
+        _str(params, "query"),
+        _int(params, "limit", 5),
+    ),
+    "append_note": lambda settings, params: append_note(
+        settings,
+        _str(params, "note_path"),
+        _str(params, "text"),
+        _str(params, "heading"),
+    ),
+    "append_daily_note": lambda settings, params: append_daily_note(
+        settings,
+        _str(params, "text"),
+        _str(params, "date"),
+        _str(params, "folder", "daily"),
+    ),
     "recent_memories": lambda settings, params: recent_memories(settings, _int(params, "limit", 5)),
     "health": lambda settings, params: health_detail(settings),
     "config_summary": lambda settings, params: config_summary(settings),

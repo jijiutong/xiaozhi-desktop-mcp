@@ -6,7 +6,6 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-
 load_dotenv()
 
 
@@ -85,7 +84,10 @@ def load_settings() -> Settings:
     )
 
     # cc/Claude Code/Codex 会话配置：默认能玩，后续可以通过 .env 收紧。
-    default_project_path = Path(default_project_root).expanduser().resolve() if default_project_root else Path.cwd().resolve()
+    if default_project_root:
+        default_project_path = Path(default_project_root).expanduser().resolve()
+    else:
+        default_project_path = Path.cwd().resolve()
     allowed_projects_value = os.getenv("CC_ALLOWED_PROJECTS", str(default_project_path))
     cc_allowed_projects = _split_paths(allowed_projects_value)
     cc_allowed_clis = _split_csv(os.getenv("CC_ALLOWED_CLIS", "claude,codex"))

@@ -10,12 +10,11 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
 from .config import load_settings
-from .tools.apps import close_app as close_app_impl
-from .tools.apps import open_app as open_app_impl
+from .tools.apps import close_app as close_app_impl, open_app as open_app_impl
 from .tools.catalog import tool_catalog as desktop_tool_catalog_impl
 from .tools.cc_session import (
-    close_terminal as cc_close_terminal_impl,
     cleanup_sessions as cc_cleanup_sessions_impl,
+    close_terminal as cc_close_terminal_impl,
     focus_session as cc_focus_session_impl,
     list_sessions as cc_list_sessions_impl,
     open_visible_session as cc_open_visible_session_impl,
@@ -60,7 +59,6 @@ from .tools.workflows import (
     remember as desktop_remember_impl,
     stop_cc as desktop_stop_cc_impl,
 )
-
 
 # FastMCP 会把下面用 @mcp.tool 标记的函数暴露给小智/LLM 调用。
 mcp = FastMCP("Xiaozhi Desktop MCP")

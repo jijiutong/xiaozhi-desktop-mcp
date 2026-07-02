@@ -13,7 +13,12 @@ def health_detail(settings: Settings) -> dict:
     """Run read-only checks for the local desktop MCP environment."""
     checks = [
         _path_check("obsidian_vault", settings.obsidian_vault, must_exist=True, writable=False),
-        _path_check("obsidian_memory_parent", settings.obsidian_vault / settings.obsidian_memory_file, must_exist=False, writable=True),
+        _path_check(
+            "obsidian_memory_parent",
+            settings.obsidian_vault / settings.obsidian_memory_file,
+            must_exist=False,
+            writable=True,
+        ),
         _path_check("cc_tasks_dir", settings.cc_tasks_dir, must_exist=False, writable=True),
         _allowed_projects_check(settings),
         _cli_check(settings),
@@ -87,7 +92,12 @@ def _path_check(name: str, path: Path, must_exist: bool, writable: bool) -> dict
                 return _check(name, "warning", f"parent path does not exist yet: {parent}", str(target))
             if not _is_writable(parent):
                 return _check(name, "fail", f"parent path is not writable: {parent}", str(target))
-            return _check(name, "warning", f"path does not exist yet, but parent is writable: {check_path}", str(target))
+            return _check(
+                name,
+                "warning",
+                f"path does not exist yet, but parent is writable: {check_path}",
+                str(target),
+            )
     return _check(name, "ok", "path check passed", str(target))
 
 
@@ -121,7 +131,12 @@ def _terminal_check(settings: Settings) -> dict:
         if not ok_result:
             failures.append(terminal)
     if failures:
-        return _check("cc_visible_terminals", "warning", f"some terminal apps could not be resolved: {failures}", results)
+        return _check(
+            "cc_visible_terminals",
+            "warning",
+            f"some terminal apps could not be resolved: {failures}",
+            results,
+        )
     return _check("cc_visible_terminals", "ok", "terminal apps resolved", results)
 
 

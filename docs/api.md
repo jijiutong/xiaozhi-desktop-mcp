@@ -16,9 +16,9 @@ GET  /api/v1/actions
 POST /api/v1/dispatch
 ```
 
-Legacy `/tools/...` routes remain available for debugging and fine-grained control.
+HTTP clients should use `POST /api/v1/dispatch`. Legacy `/tools/...` HTTP routes were removed to keep one safety policy.
 
-If `DESKTOP_MCP_AUTH_TOKEN` is set, protected API and tool routes require either:
+If `DESKTOP_MCP_AUTH_TOKEN` is set, protected API routes require either:
 
 ```text
 Authorization: Bearer <token>

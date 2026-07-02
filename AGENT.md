@@ -16,7 +16,7 @@
 
 不要把它做成新的小智服务器，也不要在这里实现 LLM/RAG/ASR/TTS。
 
-当前稳定版本是 `1.0.0`。1.0 后默认保持 `/api/v1/...` 响应 envelope 兼容，不随意改 action 名、字段名或旧 `/tools/...` 路由。
+当前稳定版本是 `1.0.0`。1.0 后默认保持 `/api/v1/...` 响应 envelope 兼容，不随意改 action 名和字段名。
 
 ## 当前重要文件
 
@@ -80,7 +80,7 @@ Java 侧桥接文件：
 - review/fix/test/git status 不需要单独工具，直接用 `cc_send_instruction` 输入中文给 Claude/Codex。
 - `/init`、`/compact`、`/clear`、`/model` 不需要单独包装，走 `cc_send_slash_command` 或 `cc_switch_model`。
 - 小智/Java 后端优先使用 `desktop_*` wrapper；底层 `cc_*` 工具主要用于精细控制和调试。
-- Java/Python/Go 等新客户端优先使用 `/api/v1/dispatch`；旧 `/tools/...` 路由保留兼容。
+- Java/Python/Go 等 HTTP 客户端统一使用 `/api/v1/dispatch`。
 - 新增 API v1 action 时，要同步 `api_v1.py` 里的 `_ACTION_HANDLERS` 和 `actions_catalog()`。
 - 新增或修改公共接口时同步 `docs/api.md`、必要时同步 `docs/clients.md` 和 `CHANGELOG.md`。
 - 先保持工具少而通用，不要把每句话都做成一个 action。
@@ -148,34 +148,41 @@ xiaozhi-desktop-http
 打开可见 Claude：
 
 ```bash
-curl -X POST http://127.0.0.1:8765/tools/cc/open-visible-session \
+curl -X POST http://127.0.0.1:8765/api/v1/dispatch \
   -H "Content-Type: application/json" \
   -d '{
-    "project_path": "/path/to/your/project",
-    "cli": "claude",
-    "cli_args": "",
-    "terminal": "Terminal",
-    "session_id": "default"
+    "request_id": "open-demo",
+    "action": "open_cc_project",
+    "params": {
+      "project_path": "/path/to/your/project",
+      "cli": "claude",
+      "terminal": "Terminal",
+      "session_id": "default"
+    }
   }'
 ```
 
 发送中文指令给可见 Terminal 会话：
 
 ```bash
-curl -X POST http://127.0.0.1:8765/tools/cc/send-instruction \
+curl -X POST http://127.0.0.1:8765/api/v1/dispatch \
   -H "Content-Type: application/json" \
   -d '{
-    "session_id": "default",
-    "text": "帮我 review 当前项目，重点看 bug 和风险。"
+    "request_id": "ask-demo",
+    "action": "ask_cc",
+    "params": {
+      "session_id": "default",
+      "text": "帮我 review 当前项目，重点看 bug 和风险。"
+    }
   }'
 ```
 
 关闭 Claude Code 和前台 Terminal 窗口：
 
 ```bash
-curl -X POST http://127.0.0.1:8765/tools/cc/stop-session \
+curl -X POST http://127.0.0.1:8765/api/v1/dispatch \
   -H "Content-Type: application/json" \
-  -d '{"session_id": "default"}'
+  -d '{"request_id":"stop-demo","action":"stop_cc","params":{"session_id":"default"}}'
 ```
 
 Java 编译检查：

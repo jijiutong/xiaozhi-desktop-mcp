@@ -40,4 +40,4 @@ These actions should stay disabled unless a user explicitly opts in with strong 
 
 - Localhost mode can run without a token for personal desktop use.
 - Non-localhost HTTP binding requires `DESKTOP_MCP_AUTH_TOKEN`.
-- Protected `/api/...` and `/tools/...` routes accept `Authorization: Bearer <token>` or `X-Desktop-Mcp-Token`.
+- Protected `/api/...` routes accept `Authorization: Bearer <token>` or `X-Desktop-Mcp-Token`.

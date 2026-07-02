@@ -31,13 +31,17 @@ curl http://127.0.0.1:8765/api/v1/health
 Detailed desktop checks:
 
 ```bash
-curl http://127.0.0.1:8765/tools/desktop/health-detail
+curl -X POST http://127.0.0.1:8765/api/v1/dispatch \
+  -H "Content-Type: application/json" \
+  -d '{"request_id":"health-detail","action":"health","params":{}}'
 ```
 
 Configuration summary:
 
 ```bash
-curl http://127.0.0.1:8765/tools/desktop/config-summary
+curl -X POST http://127.0.0.1:8765/api/v1/dispatch \
+  -H "Content-Type: application/json" \
+  -d '{"request_id":"config-summary","action":"config_summary","params":{}}'
 ```
 
 If you bind the HTTP server to a non-localhost address, set `DESKTOP_MCP_AUTH_TOKEN`.
@@ -54,7 +58,9 @@ curl -H "Authorization: Bearer change-me" http://127.0.0.1:8765/api/v1/actions
 Run:
 
 ```bash
-curl -X POST http://127.0.0.1:8765/tools/cc/cleanup-sessions
+curl -X POST http://127.0.0.1:8765/api/v1/dispatch \
+  -H "Content-Type: application/json" \
+  -d '{"request_id":"cleanup","action":"cleanup_sessions","params":{}}'
 ```
 
 Then open a new visible session.

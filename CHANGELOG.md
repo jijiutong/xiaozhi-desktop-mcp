@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Removed legacy `/tools/...` HTTP routes. HTTP clients now use only `/api/v1/dispatch`.
+- Updated tool catalog entries to expose `api_v1_action` names instead of legacy HTTP paths.
+- Updated operations and maintainer docs to use API v1 dispatch examples.
+
 ## 1.0.0 - 2026-07-01
 
 Stable local desktop MCP/HTTP service for Xiaozhi and language-agnostic clients.
@@ -29,5 +37,4 @@ Stable local desktop MCP/HTTP service for Xiaozhi and language-agnostic clients.
 
 ### Compatibility
 
-- Existing `/tools/...` routes are preserved for low-level control and debugging.
-- New clients should prefer `/api/v1/dispatch`.
+- HTTP clients should use `/api/v1/dispatch`.

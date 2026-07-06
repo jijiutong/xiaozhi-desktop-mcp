@@ -32,6 +32,9 @@ or:
 X-Desktop-Mcp-Token: <token>
 ```
 
+Responses include `X-Request-Id`. Clients can pass their own `X-Request-Id`
+header; otherwise the server generates one and logs it.
+
 ## Dispatch Request
 
 ```json

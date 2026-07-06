@@ -56,6 +56,12 @@ These actions should stay disabled unless a user explicitly opts in with strong 
 - Localhost mode can run without a token for personal desktop use.
 - Non-localhost HTTP binding requires `DESKTOP_MCP_AUTH_TOKEN`.
 - Protected `/api/...` routes accept `Authorization: Bearer <token>` or `X-Desktop-Mcp-Token`.
+- Standard Streamable HTTP MCP runs at `/mcp` by default and accepts the same
+  token headers.
+- HTTP responses include `X-Request-Id`; logs include request id, path, status,
+  duration, client host, and auth result without printing the token.
+- stdio MCP tool calls log tool name, success flag, and duration without logging
+  full tool arguments.
 
 ## Terminal Targeting
 

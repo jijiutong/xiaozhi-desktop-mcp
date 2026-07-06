@@ -101,6 +101,30 @@ curl -H "Authorization: Bearer change-me" http://127.0.0.1:8765/api/v1/actions
 curl http://127.0.0.1:8765/api/v1/health
 ```
 
+如果你的 MCP client 支持标准 Streamable HTTP，可以启动标准 MCP HTTP 入口：
+
+```bash
+xiaozhi-desktop-mcp-streamable
+```
+
+默认监听：
+
+```text
+http://127.0.0.1:8766/mcp
+```
+
+可用环境变量调整：
+
+```env
+DESKTOP_MCP_STREAMABLE_HOST=127.0.0.1
+DESKTOP_MCP_STREAMABLE_PORT=8766
+DESKTOP_MCP_STREAMABLE_PATH=/mcp
+DESKTOP_MCP_AUTH_TOKEN=change-me
+```
+
+如果把 Streamable HTTP 绑定到非本机地址，同样必须设置 `DESKTOP_MCP_AUTH_TOKEN`。客户端传
+`Authorization: Bearer change-me` 或 `X-Desktop-Mcp-Token: change-me`。
+
 ## 多语言统一调用
 
 推荐所有新客户端使用：

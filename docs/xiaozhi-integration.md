@@ -1,6 +1,6 @@
 # Xiaozhi Integration
 
-This project is a standard MCP server over stdio. It does not talk to the ESP32 device directly.
+This project is a standard MCP server over stdio or Streamable HTTP. It does not talk to the ESP32 device directly.
 
 ## Integration Options
 
@@ -19,6 +19,23 @@ This is best for quick demos and local experiments.
 Use `huangjunsen0406/xiaozhi-mcphub` when you want a dashboard, multiple MCP servers, grouping, logs, and tool routing.
 
 Register this project as a stdio MCP server, then bind it to the Xiaozhi endpoint that should control this Mac.
+
+### Streamable HTTP MCP Clients
+
+Use this when a client can connect directly to a standard MCP Streamable HTTP endpoint:
+
+```bash
+xiaozhi-desktop-mcp-streamable
+```
+
+Then point the client at:
+
+```text
+http://127.0.0.1:8766/mcp
+```
+
+If the endpoint is not localhost-only, set `DESKTOP_MCP_AUTH_TOKEN` and pass it
+as `Authorization: Bearer <token>` or `X-Desktop-Mcp-Token`.
 
 ### `xiaozhi-esp32-server`
 

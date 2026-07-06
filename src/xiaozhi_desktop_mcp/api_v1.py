@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -36,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 def dispatch(settings: Settings, action: str, params: dict | None = None, request_id: str = "") -> dict:
     """Dispatch a language-agnostic HTTP action and wrap the result in a stable envelope."""
+    started_at = time.monotonic()
     normalized = _normalize_action(action)
     handler = _ACTION_HANDLERS.get(normalized)
     if handler is None:
@@ -52,7 +54,9 @@ def dispatch(settings: Settings, action: str, params: dict | None = None, reques
         except Exception:
             logger.exception("action %s failed", normalized)
             result = fail(f"action {normalized} failed", "执行动作时发生异常。")
-    return _envelope(normalized or action, result, request_id)
+    envelope = _envelope(normalized or action, result, request_id)
+    _log_dispatch(normalized or action, envelope, params or {}, started_at)
+    return envelope
 
 
 def actions_catalog() -> dict:
@@ -257,6 +261,21 @@ def _xcode_params() -> dict[str, str]:
 
 def _normalize_action(action: str) -> str:
     return action.strip().lower().replace("-", "_")
+
+
+def _log_dispatch(action: str, envelope: dict, params: dict[str, Any], started_at: float) -> None:
+    cost_ms = int((time.monotonic() - started_at) * 1000)
+    success = bool(envelope.get("success"))
+    log_method = logger.info if success else logger.warning
+    log_method(
+        "desktop_mcp_action request_id=%s action=%s success=%s cost_ms=%s param_keys=%s error=%s",
+        envelope.get("request_id", ""),
+        action,
+        success,
+        cost_ms,
+        sorted(params.keys()),
+        envelope.get("error", ""),
+    )
 
 
 def _str(params: dict[str, Any], key: str, default: str = "") -> str:

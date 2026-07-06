@@ -39,6 +39,7 @@ Issues = "https://github.com/jijiutong/xiaozhi-desktop-mcp/issues"
 
 [project.scripts]
 xiaozhi-desktop-mcp = "xiaozhi_desktop_mcp.server:main"
+xiaozhi-desktop-mcp-streamable = "xiaozhi_desktop_mcp.server:main_streamable_http"
 xiaozhi-desktop-http = "xiaozhi_desktop_mcp.http_server:main"
 
 [tool.pytest.ini_options]

@@ -18,6 +18,8 @@
 - Added `desktop-mcp.yaml`, `category_registry`, and `desktop_intent` for generic category-based desktop workflows.
 - Added built-in category adapters for music, docs, AI, dev, browser, and system intents.
 - Added browser open/search, Music controls, Finder safe path open/reveal, and clipboard get/set capabilities through `desktop_intent`.
+- Added a shared action registry for API catalog metadata, risk levels, and pending-action parameter rules.
+- Centralized API v1 medium-risk confirmation handling through a shared pending-action helper.
 
 ## 1.0.0 - 2026-07-01
 

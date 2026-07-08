@@ -27,6 +27,9 @@ src/xiaozhi_desktop_mcp/config.py
 src/xiaozhi_desktop_mcp/api_v1.py
 语言无关 HTTP API dispatch。Java/Python/Go 等新客户端优先走 `/api/v1/dispatch`。
 
+src/xiaozhi_desktop_mcp/action_registry.py
+API action、风险等级、pending action 参数规则的统一元数据来源。
+
 src/xiaozhi_desktop_mcp/safety.py
 路径、App、CLI、slash policy 等安全边界。
 
@@ -81,7 +84,8 @@ Java 侧桥接文件：
 - `/init`、`/compact`、`/clear`、`/model` 不需要单独包装，走 `cc_send_slash_command` 或 `cc_switch_model`。
 - 小智/Java 后端优先使用 `desktop_*` wrapper；底层 `cc_*` 工具主要用于精细控制和调试。
 - Java/Python/Go 等 HTTP 客户端统一使用 `/api/v1/dispatch`。
-- 新增 API v1 action 时，要同步 `api_v1.py` 里的 `_ACTION_HANDLERS` 和 `actions_catalog()`。
+- 新增 API v1 action 时，优先更新 `action_registry.py`，再接入 `api_v1.py` 的 `_ACTION_HANDLERS`。
+- 中风险动作需要在 `action_registry.py` 声明 `pending_action_type`、允许参数和必填参数。
 - 新增或修改公共接口时同步 `docs/api.md`、必要时同步 `docs/clients.md` 和 `CHANGELOG.md`。
 - 先保持工具少而通用，不要把每句话都做成一个 action。
 

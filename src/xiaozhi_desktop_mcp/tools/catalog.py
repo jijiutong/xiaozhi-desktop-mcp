@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from ..action_registry import api_action_specs
 from ..responses import ok
 
 
 def tool_catalog() -> dict:
     """Return a compact catalog that helps Xiaozhi/Java route to the right tool."""
+    risk_by_action = {spec.name: spec.risk for spec in api_action_specs()}
     tools = [
         {
             "name": "desktop_remember",
@@ -181,6 +183,10 @@ def tool_catalog() -> dict:
             "api_v1_action": "cleanup_sessions",
         },
     ]
+    for tool in tools:
+        api_action = str(tool.get("api_v1_action", ""))
+        if api_action in risk_by_action:
+            tool["risk"] = risk_by_action[api_action]
     return ok(
         {
             "recommended_default": "HTTP 客户端统一使用 POST /api/v1/dispatch，并传入 api_v1_action。",

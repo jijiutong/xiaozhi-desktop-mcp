@@ -5,6 +5,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
+from .action_registry import api_action_specs
 from .config import Settings
 from .responses import fail, ok
 from .tools.apps import close_app, open_app
@@ -61,153 +62,7 @@ def dispatch(settings: Settings, action: str, params: dict | None = None, reques
 
 def actions_catalog() -> dict:
     """Return machine-friendly action definitions for API clients."""
-    actions = [
-        _action("remember", "low", {"text": "string", "tags": "string optional"}, "Save memory to Obsidian."),
-        _action("app_open", "low", {"app_name": "string"}, "Open an allowlisted macOS app."),
-        _action("app_close", "medium", {"app_name": "string", "confirm": "boolean optional"}, "Close an app."),
-        _action(
-            "open_cc_project",
-            "low",
-            {"project_path": "string optional", "session_id": "string optional"},
-            "Open Claude Code/Codex by path.",
-        ),
-        _action(
-            "open_cc_project_named",
-            "low",
-            {"project": "string", "session_id": "string optional"},
-            "Open Claude Code/Codex by project alias.",
-        ),
-        _action(
-            "ask_cc",
-            "medium",
-            {
-                "text": "string",
-                "project_path": "string optional",
-                "confirm": "boolean optional",
-                "allow_frontmost": "boolean optional",
-            },
-            "Send instruction to Claude Code/Codex.",
-        ),
-        _action(
-            "ask_cc_project",
-            "medium",
-            {
-                "project": "string",
-                "text": "string",
-                "confirm": "boolean optional",
-                "allow_frontmost": "boolean optional",
-            },
-            "Send instruction by project alias.",
-        ),
-        _action("check_cc", "low", {"session_id": "string optional"}, "Check Claude Code/Codex status."),
-        _action(
-            "cc_send_slash_command",
-            "medium",
-            {
-                "command": "string",
-                "args": "string optional",
-                "session_id": "string optional",
-                "confirm": "boolean optional",
-                "allow_frontmost": "boolean optional",
-            },
-            "Send a slash command to Claude Code/Codex.",
-        ),
-        _action(
-            "cc_switch_model",
-            "medium",
-            {
-                "model": "string",
-                "session_id": "string optional",
-                "confirm": "boolean optional",
-                "allow_frontmost": "boolean optional",
-            },
-            "Switch Claude Code/Codex model.",
-        ),
-        _action(
-            "continue_cc",
-            "medium",
-            {
-                "session_id": "string optional",
-                "confirm": "boolean optional",
-                "allow_frontmost": "boolean optional",
-            },
-            "Send yes/continue.",
-        ),
-        _action("focus_cc", "low", {"session_id": "string optional"}, "Focus Claude Code/Codex window."),
-        _action(
-            "stop_cc",
-            "medium",
-            {
-                "session_id": "string optional",
-                "confirm": "boolean optional",
-                "allow_frontmost": "boolean optional",
-            },
-            "Stop Claude Code/Codex session.",
-        ),
-        _action("search_obsidian", "low", {"query": "string", "limit": "integer optional"}, "Search Obsidian notes."),
-        _action(
-            "create_note",
-            "low",
-            {"note_path": "string", "text": "string optional", "overwrite": "boolean optional"},
-            "Create an Obsidian note.",
-        ),
-        _action("open_note", "low", {"note_path": "string"}, "Open an Obsidian note."),
-        _action(
-            "append_note",
-            "low",
-            {"note_path": "string", "text": "string"},
-            "Append a note inside Obsidian vault.",
-        ),
-        _action("append_daily_note", "low", {"text": "string", "date": "YYYY-MM-DD optional"}, "Append daily note."),
-        _action("recent_memories", "low", {"limit": "integer optional"}, "Read recent voice memories."),
-        _action("health", "low", {}, "Run desktop MCP health checks."),
-        _action("config_summary", "low", {}, "Return non-secret config summary."),
-        _action("tool_catalog", "low", {}, "Return reader-facing tool catalog."),
-        _action("category_registry", "low", {}, "Return desktop category registry."),
-        _action(
-            "desktop_intent",
-            "variable",
-            {"category": "string", "intent": "string", "params": "object optional"},
-            "Route a generic desktop category intent.",
-        ),
-        _action("list_projects", "low", {}, "List allowed projects."),
-        _action("resolve_project", "low", {"project": "string"}, "Resolve project alias/path."),
-        _action("cleanup_sessions", "low", {}, "Clean stale Claude Code/Codex session registrations."),
-        _action(
-            "xcode_open_project",
-            "low",
-            {"project_path": "string optional", "xcode_path": "string optional"},
-            "Open an allowlisted Xcode project.",
-        ),
-        _action(
-            "xcode_build",
-            "medium",
-            _xcode_params(),
-            "Run xcodebuild build.",
-        ),
-        _action(
-            "xcode_test",
-            "medium",
-            _xcode_params(),
-            "Run xcodebuild test.",
-        ),
-        _action(
-            "xcode_clean",
-            "medium",
-            _xcode_params(),
-            "Run xcodebuild clean.",
-        ),
-        _action("xcode_last_errors", "low", {"limit": "integer optional"}, "Return recent xcodebuild errors."),
-        _action(
-            "pending_create",
-            "low",
-            {"action_type": "string", "params": "object optional"},
-            "Create pending action.",
-        ),
-        _action("pending_list", "low", {"status": "string optional"}, "List pending actions."),
-        _action("pending_confirm", "medium", {"action_id": "string"}, "Confirm pending action."),
-        _action("pending_cancel", "low", {"action_id": "string"}, "Cancel pending action."),
-    ]
+    actions = [spec.catalog_entry() for spec in api_action_specs()]
     return ok(
         {"version": "v1", "actions": actions, "count": len(actions)},
         f"已返回 {len(actions)} 个 API 动作说明。",
@@ -236,26 +91,6 @@ def _envelope(action: str, result: dict, request_id: str) -> dict:
         "error_spoken_message": result.get("error_spoken_message", ""),
         "error": result.get("error", ""),
         "data": data,
-    }
-
-
-def _action(name: str, risk: str, params: dict[str, str], description: str) -> dict:
-    return {
-        "name": name,
-        "risk": risk,
-        "params": params,
-        "description": description,
-    }
-
-
-def _xcode_params() -> dict[str, str]:
-    return {
-        "project_path": "string optional",
-        "xcode_path": "string optional",
-        "scheme": "string optional",
-        "configuration": "string optional",
-        "destination": "string optional",
-        "confirm": "boolean optional",
     }
 
 
@@ -304,9 +139,13 @@ def _remember(settings: Settings, params: dict[str, Any]) -> dict:
 
 def _app_close(settings: Settings, params: dict[str, Any]) -> dict:
     pending_params = {"app_name": _str(params, "app_name")}
-    if not _bool(params, "confirm"):
-        return create_pending_action("app_close", pending_params, f"关闭 {pending_params['app_name']}")
-    return close_app(settings, pending_params["app_name"])
+    return _confirm_or_pending(
+        params,
+        "app_close",
+        pending_params,
+        lambda: close_app(settings, pending_params["app_name"]),
+        f"关闭 {pending_params['app_name']}",
+    )
 
 
 def _open_cc_project(settings: Settings, params: dict[str, Any]) -> dict:
@@ -331,6 +170,18 @@ def _open_cc_project_named(settings: Settings, params: dict[str, Any]) -> dict:
     )
 
 
+def _confirm_or_pending(
+    params: dict[str, Any],
+    action_type: str,
+    pending_params: dict[str, Any],
+    runner: Callable[[], dict],
+    title: str = "",
+) -> dict:
+    if not _bool(params, "confirm"):
+        return create_pending_action(action_type, pending_params, title)
+    return runner()
+
+
 def _ask_cc(settings: Settings, params: dict[str, Any]) -> dict:
     pending_params = {
         "text": _str(params, "text"),
@@ -341,17 +192,21 @@ def _ask_cc(settings: Settings, params: dict[str, Any]) -> dict:
         "open_if_needed": _bool(params, "open_if_needed", True),
         "allow_frontmost": _bool(params, "allow_frontmost", False),
     }
-    if not _bool(params, "confirm"):
-        return create_pending_action("desktop_ask_cc", pending_params, "发送任务给 Claude Code")
-    return ask_cc(
-        settings,
-        pending_params["text"],
-        pending_params["project_path"],
-        pending_params["session_id"],
-        pending_params["cli"],
-        pending_params["terminal"],
-        bool(pending_params["open_if_needed"]),
-        bool(pending_params["allow_frontmost"]),
+    return _confirm_or_pending(
+        params,
+        "desktop_ask_cc",
+        pending_params,
+        lambda: ask_cc(
+            settings,
+            pending_params["text"],
+            pending_params["project_path"],
+            pending_params["session_id"],
+            pending_params["cli"],
+            pending_params["terminal"],
+            bool(pending_params["open_if_needed"]),
+            bool(pending_params["allow_frontmost"]),
+        ),
+        "发送任务给 Claude Code",
     )
 
 
@@ -365,30 +220,35 @@ def _ask_cc_project(settings: Settings, params: dict[str, Any]) -> dict:
         "open_if_needed": _bool(params, "open_if_needed", True),
         "allow_frontmost": _bool(params, "allow_frontmost", False),
     }
-    if not _bool(params, "confirm"):
-        return create_pending_action("desktop_ask_cc_project", pending_params, "按项目发送任务给 Claude Code")
-    return ask_cc_project(
-        settings,
-        pending_params["project"],
-        pending_params["text"],
-        pending_params["session_id"],
-        pending_params["cli"],
-        pending_params["terminal"],
-        bool(pending_params["open_if_needed"]),
-        bool(pending_params["allow_frontmost"]),
+    return _confirm_or_pending(
+        params,
+        "desktop_ask_cc_project",
+        pending_params,
+        lambda: ask_cc_project(
+            settings,
+            pending_params["project"],
+            pending_params["text"],
+            pending_params["session_id"],
+            pending_params["cli"],
+            pending_params["terminal"],
+            bool(pending_params["open_if_needed"]),
+            bool(pending_params["allow_frontmost"]),
+        ),
+        "按项目发送任务给 Claude Code",
     )
 
 
 def _continue_cc(settings: Settings, params: dict[str, Any]) -> dict:
     session_id = _str(params, "session_id", "default")
     allow_frontmost = _bool(params, "allow_frontmost", False)
-    if not _bool(params, "confirm"):
-        return create_pending_action(
-            "cc_continue",
-            {"session_id": session_id, "allow_frontmost": allow_frontmost},
-            "让 Claude Code 继续",
-        )
-    return continue_cc(settings, session_id, True, allow_frontmost)
+    pending_params = {"session_id": session_id, "allow_frontmost": allow_frontmost}
+    return _confirm_or_pending(
+        params,
+        "cc_continue",
+        pending_params,
+        lambda: continue_cc(settings, session_id, True, allow_frontmost),
+        "让 Claude Code 继续",
+    )
 
 
 def _cc_send_slash_command(settings: Settings, params: dict[str, Any]) -> dict:
@@ -398,15 +258,19 @@ def _cc_send_slash_command(settings: Settings, params: dict[str, Any]) -> dict:
         "session_id": _str(params, "session_id", "default"),
         "allow_frontmost": _bool(params, "allow_frontmost", False),
     }
-    if not _bool(params, "confirm"):
-        return create_pending_action("cc_send_slash_command", pending_params, f"发送命令 {pending_params['command']}")
-    return send_slash_command(
-        settings,
-        pending_params["command"],
-        pending_params["args"],
-        pending_params["session_id"],
-        True,
-        bool(pending_params["allow_frontmost"]),
+    return _confirm_or_pending(
+        params,
+        "cc_send_slash_command",
+        pending_params,
+        lambda: send_slash_command(
+            settings,
+            pending_params["command"],
+            pending_params["args"],
+            pending_params["session_id"],
+            True,
+            bool(pending_params["allow_frontmost"]),
+        ),
+        f"发送命令 {pending_params['command']}",
     )
 
 
@@ -416,27 +280,32 @@ def _cc_switch_model(settings: Settings, params: dict[str, Any]) -> dict:
         "session_id": _str(params, "session_id", "default"),
         "allow_frontmost": _bool(params, "allow_frontmost", False),
     }
-    if not _bool(params, "confirm"):
-        return create_pending_action("cc_switch_model", pending_params, f"切换模型到 {pending_params['model']}")
-    return switch_model(
-        settings,
-        pending_params["model"],
-        pending_params["session_id"],
-        True,
-        bool(pending_params["allow_frontmost"]),
+    return _confirm_or_pending(
+        params,
+        "cc_switch_model",
+        pending_params,
+        lambda: switch_model(
+            settings,
+            pending_params["model"],
+            pending_params["session_id"],
+            True,
+            bool(pending_params["allow_frontmost"]),
+        ),
+        f"切换模型到 {pending_params['model']}",
     )
 
 
 def _stop_cc(settings: Settings, params: dict[str, Any]) -> dict:
     session_id = _str(params, "session_id", "default")
     allow_frontmost = _bool(params, "allow_frontmost", False)
-    if not _bool(params, "confirm"):
-        return create_pending_action(
-            "cc_stop",
-            {"session_id": session_id, "allow_frontmost": allow_frontmost},
-            "停止 Claude Code 会话",
-        )
-    return stop_cc(session_id, allow_frontmost)
+    pending_params = {"session_id": session_id, "allow_frontmost": allow_frontmost}
+    return _confirm_or_pending(
+        params,
+        "cc_stop",
+        pending_params,
+        lambda: stop_cc(session_id, allow_frontmost),
+        "停止 Claude Code 会话",
+    )
 
 
 def _xcode_action(action_type: str, params: dict[str, Any], runner) -> dict:
@@ -447,9 +316,7 @@ def _xcode_action(action_type: str, params: dict[str, Any], runner) -> dict:
         "configuration": _str(params, "configuration"),
         "destination": _str(params, "destination"),
     }
-    if not _bool(params, "confirm"):
-        return create_pending_action(action_type, pending_params)
-    return runner(**pending_params)
+    return _confirm_or_pending(params, action_type, pending_params, lambda: runner(**pending_params))
 
 
 def _pending_create(settings: Settings, params: dict[str, Any]) -> dict:

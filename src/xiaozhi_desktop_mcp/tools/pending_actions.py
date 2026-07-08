@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
+from ..action_registry import pending_action_types, pending_spec
 from ..config import Settings
 from ..responses import fail, ok
 from .apps import close_app
@@ -17,41 +18,7 @@ from .cc_session import (
     switch_model,
 )
 
-ALLOWED_ACTION_TYPES = frozenset(
-    {
-        "app_close",
-        "cc_close_terminal",
-        "cc_continue",
-        "cc_send_instruction",
-        "cc_send_slash_command",
-        "cc_stop",
-        "cc_switch_model",
-        "desktop_ask_cc",
-        "desktop_ask_cc_project",
-        "xcode_build",
-        "xcode_clean",
-        "xcode_test",
-    }
-)
-
-_ALLOWED_PARAM_KEYS: dict[str, frozenset[str]] = {
-    "app_close": frozenset({"app_name"}),
-    "cc_close_terminal": frozenset({"terminal"}),
-    "cc_continue": frozenset({"session_id", "allow_frontmost"}),
-    "cc_send_instruction": frozenset({"text", "session_id", "allow_frontmost"}),
-    "cc_send_slash_command": frozenset({"command", "args", "session_id", "allow_frontmost"}),
-    "cc_stop": frozenset({"session_id", "allow_frontmost"}),
-    "cc_switch_model": frozenset({"model", "session_id", "allow_frontmost"}),
-    "desktop_ask_cc": frozenset(
-        {"text", "project_path", "session_id", "cli", "terminal", "open_if_needed", "allow_frontmost"}
-    ),
-    "desktop_ask_cc_project": frozenset(
-        {"project", "text", "session_id", "cli", "terminal", "open_if_needed", "allow_frontmost"}
-    ),
-    "xcode_build": frozenset({"project_path", "xcode_path", "scheme", "configuration", "destination"}),
-    "xcode_clean": frozenset({"project_path", "xcode_path", "scheme", "configuration", "destination"}),
-    "xcode_test": frozenset({"project_path", "xcode_path", "scheme", "configuration", "destination"}),
-}
+ALLOWED_ACTION_TYPES = pending_action_types()
 
 
 @dataclass
@@ -264,18 +231,12 @@ def _serialize(action: PendingAction) -> dict:
 
 
 def _validate_params(action_type: str, params: dict[str, Any]) -> str:
-    allowed_keys = _ALLOWED_PARAM_KEYS.get(action_type, frozenset())
+    spec = pending_spec(action_type)
+    allowed_keys = spec.pending_param_keys if spec else frozenset()
     unknown_keys = sorted(set(params) - allowed_keys)
     if unknown_keys:
         return f"unknown params for {action_type}: {', '.join(unknown_keys)}"
-    required_fields = {
-        "app_close": ("app_name",),
-        "cc_send_instruction": ("text",),
-        "cc_send_slash_command": ("command",),
-        "cc_switch_model": ("model",),
-        "desktop_ask_cc": ("text",),
-        "desktop_ask_cc_project": ("project", "text"),
-    }.get(action_type, ())
+    required_fields = spec.pending_required_params if spec else ()
     for field_name in required_fields:
         if not str(params.get(field_name, "")).strip():
             return f"missing required param for {action_type}: {field_name}"

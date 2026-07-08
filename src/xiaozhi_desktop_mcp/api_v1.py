@@ -8,11 +8,13 @@ from typing import Any
 from .action_registry import api_action_specs
 from .config import Settings
 from .responses import fail, ok
-from .tools.apps import close_app, open_app
+from .tools.apps import app_status, close_app, focus_app, open_app
+from .tools.browser import browser_open_url, browser_search
 from .tools.catalog import tool_catalog
 from .tools.cc_session import cleanup_sessions, send_slash_command, switch_model
 from .tools.diagnostics import config_summary, health_detail
 from .tools.intent import desktop_intent, desktop_intent_catalog
+from .tools.music import music_control, music_search
 from .tools.obsidian import append_daily_note, append_note, create_note, open_note, recent_memories, search_notes
 from .tools.pending_actions import (
     cancel_pending_action,
@@ -331,6 +333,8 @@ def _pending_create(settings: Settings, params: dict[str, Any]) -> dict:
 _ACTION_HANDLERS: dict[str, ActionHandler] = {
     "remember": _remember,
     "app_open": lambda settings, params: open_app(settings, _str(params, "app_name")),
+    "app_focus": lambda settings, params: focus_app(settings, _str(params, "app_name")),
+    "app_status": lambda settings, params: app_status(settings, _str(params, "app_name")),
     "app_close": _app_close,
     "open_cc_project": _open_cc_project,
     "open_cc_project_named": _open_cc_project_named,
@@ -405,6 +409,28 @@ _ACTION_HANDLERS: dict[str, ActionHandler] = {
         lambda **kwargs: xcode_clean(settings, **kwargs),
     ),
     "xcode_last_errors": lambda settings, params: xcode_last_errors(_int(params, "limit", 20)),
+    "browser_open": lambda settings, params: browser_open_url(
+        settings,
+        _str(params, "url"),
+        _str(params, "app_name") or _str(params, "app"),
+    ),
+    "browser_search": lambda settings, params: browser_search(
+        settings,
+        _str(params, "query"),
+        _str(params, "app_name") or _str(params, "app"),
+        _str(params, "engine", "google"),
+    ),
+    "music_control": lambda settings, params: music_control(
+        settings,
+        _str(params, "command", "toggle"),
+        _str(params, "app_name") or _str(params, "app"),
+    ),
+    "music_search": lambda settings, params: music_search(
+        settings,
+        _str(params, "query"),
+        _str(params, "browser"),
+        _str(params, "provider"),
+    ),
     "pending_create": _pending_create,
     "pending_list": lambda settings, params: list_pending_actions(_str(params, "status", "pending")),
     "pending_confirm": lambda settings, params: confirm_pending_action(settings, _str(params, "action_id")),

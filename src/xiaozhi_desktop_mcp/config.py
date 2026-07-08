@@ -85,9 +85,8 @@ def load_settings() -> Settings:
         desktop_config_path = Path.cwd() / desktop_config_path
     desktop_config_path = desktop_config_path.resolve()
     default_project_root = os.getenv("DEFAULT_PROJECT_ROOT", "")
-    allowed_apps = _split_csv(
-        os.getenv("ALLOWED_APPS", "Obsidian,Xcode,Google Chrome,Safari,Music,Finder,Terminal")
-    )
+    default_allowed_apps = "Obsidian,Xcode,Google Chrome,Safari,Microsoft Edge,Arc,Music,网易云音乐,Finder,Terminal"
+    allowed_apps = _split_csv(os.getenv("ALLOWED_APPS", default_allowed_apps))
 
     # cc/Claude Code/Codex 会话配置：默认能玩，后续可以通过 .env 收紧。
     if default_project_root:

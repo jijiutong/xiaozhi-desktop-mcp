@@ -102,7 +102,13 @@ focus_cc
 stop_cc
 cleanup_sessions
 app_open
+app_focus
+app_status
 app_close
+browser_open
+browser_search
+music_control
+music_search
 search_obsidian
 append_note
 append_daily_note
@@ -147,6 +153,7 @@ docs     remember, search, create, open, append, daily
 ai       open, send, continue, status, focus, stop, slash, model
 dev      open, build, test, clean, errors
 browser  open, search
+app      open, focus, status, close
 system   open, reveal, clipboard_get, clipboard_set
 ```
 

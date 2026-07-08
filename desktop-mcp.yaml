@@ -3,7 +3,7 @@
   "categories": {
     "music": {
       "default_app": "Music",
-      "apps": ["Music", "Spotify"],
+      "apps": ["Music", "网易云音乐", "NetEase Cloud Music", "Spotify"],
       "intents": ["open", "play", "pause", "toggle", "next", "previous", "search"]
     },
     "docs": {
@@ -23,8 +23,13 @@
     },
     "browser": {
       "default_app": "Google Chrome",
-      "apps": ["Google Chrome", "Safari", "Arc"],
+      "apps": ["Google Chrome", "Safari", "Microsoft Edge", "Arc"],
       "intents": ["open", "search"]
+    },
+    "app": {
+      "default_app": "Obsidian",
+      "apps": ["Obsidian", "Google Chrome", "Safari", "Music", "网易云音乐", "Finder"],
+      "intents": ["open", "focus", "status", "close"]
     },
     "system": {
       "default_app": "Finder",

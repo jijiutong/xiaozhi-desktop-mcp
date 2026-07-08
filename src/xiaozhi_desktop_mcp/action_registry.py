@@ -79,6 +79,8 @@ def _action(
 _API_ACTION_SPECS = (
     _action("remember", "low", {"text": "string", "tags": "string optional"}, "Save memory to Obsidian."),
     _action("app_open", "low", {"app_name": "string"}, "Open an allowlisted macOS app."),
+    _action("app_focus", "low", {"app_name": "string"}, "Focus an allowlisted macOS app."),
+    _action("app_status", "low", {"app_name": "string"}, "Check whether an allowlisted macOS app is running."),
     _action(
         "app_close",
         "medium",
@@ -247,6 +249,30 @@ _API_ACTION_SPECS = (
         pending_param_keys=frozenset({"project_path", "xcode_path", "scheme", "configuration", "destination"}),
     ),
     _action("xcode_last_errors", "low", {"limit": "integer optional"}, "Return recent xcodebuild errors."),
+    _action(
+        "browser_open",
+        "low",
+        {"url": "string", "app_name": "string optional"},
+        "Open an http(s) URL in an allowlisted browser.",
+    ),
+    _action(
+        "browser_search",
+        "low",
+        {"query": "string", "engine": "string optional", "app_name": "string optional"},
+        "Search the web in an allowlisted browser.",
+    ),
+    _action(
+        "music_control",
+        "low",
+        {"command": "play|pause|toggle|next|previous", "app_name": "string optional"},
+        "Control an allowlisted music app.",
+    ),
+    _action(
+        "music_search",
+        "low",
+        {"query": "string", "provider": "apple|netease optional", "browser": "string optional"},
+        "Search Apple Music or NetEase Cloud Music in an allowlisted browser.",
+    ),
     _action(
         "pending_create",
         "low",

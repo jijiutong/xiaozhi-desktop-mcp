@@ -29,7 +29,7 @@ def settings(tmp_path: Path) -> Settings:
         cc_tasks_dir=vault / "tasks",
         desktop_config_path=tmp_path / "desktop-mcp.yaml",
         default_project_root=str(project),
-        allowed_apps=frozenset({"Obsidian", "Terminal"}),
+        allowed_apps=frozenset({"Obsidian", "Terminal", "Google Chrome", "Music", "网易云音乐"}),
         cc_allowed_projects=frozenset({project}),
         cc_allowed_clis=frozenset({"claude", "codex"}),
         cc_default_cli="claude",

@@ -4,7 +4,7 @@ from typing import Any
 
 from ..config import Settings
 from ..responses import fail
-from .apps import close_app, open_app
+from .apps import app_status, close_app, focus_app, open_app
 from .browser import browser_open_url, browser_search
 from .cc_session import send_slash_command, switch_model
 from .clipboard import clipboard_get, clipboard_set
@@ -66,6 +66,14 @@ def _app_close(settings: Settings, params: dict[str, Any]) -> dict:
     if not _bool(params, "confirm"):
         return create_pending_action("app_close", pending_params)
     return close_app(settings, pending_params["app_name"])
+
+
+def _app_focus(settings: Settings, params: dict[str, Any]) -> dict:
+    return focus_app(settings, _str(params, "app_name") or _str(params, "app"))
+
+
+def _app_status(settings: Settings, params: dict[str, Any]) -> dict:
+    return app_status(settings, _str(params, "app_name") or _str(params, "app"))
 
 
 def _docs_create(settings: Settings, params: dict[str, Any]) -> dict:
@@ -213,7 +221,7 @@ def _music_previous(settings: Settings, params: dict[str, Any]) -> dict:
 
 
 def _music_search(settings: Settings, params: dict[str, Any]) -> dict:
-    return music_search(settings, _str(params, "query"), _str(params, "browser"))
+    return music_search(settings, _str(params, "query"), _str(params, "browser"), _str(params, "provider"))
 
 
 def _docs_remember(settings: Settings, params: dict[str, Any]) -> dict:
@@ -300,6 +308,8 @@ def _int(params: dict[str, Any], key: str, default: int = 0) -> int:
 _HANDLERS = {
     ("app", "open"): _app_open,
     ("app", "close"): _app_close,
+    ("app", "focus"): _app_focus,
+    ("app", "status"): _app_status,
     ("music", "open"): _music_open,
     ("music", "play"): _music_play,
     ("music", "pause"): _music_pause,

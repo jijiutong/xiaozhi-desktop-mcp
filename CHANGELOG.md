@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 2.1.0 - 2026-07-08
+
+### Added
+
+- Added API v1 actions for focusing allowlisted apps and checking app running status.
+- Added API v1 browser open/search actions backed by the existing http(s)-only browser safety checks.
+- Added API v1 music control/search actions, including NetEase Cloud Music web search support.
+- Added desktop intent support for app focus/status and NetEase music search provider routing.
+
+### Changed
+
+- Expanded default app allowlist and desktop category registry for common browsers and NetEase Cloud Music.
+
 ## 2.0.0 - 2026-07-08
 
 Major release that keeps `/api/v1/...` wire compatibility while making action

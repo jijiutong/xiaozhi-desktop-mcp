@@ -8,7 +8,7 @@
 
 [API](docs/api.md) · [Client Examples](docs/clients.md) · [Operations](docs/operations.md) · [Security](docs/security.md) · [Xiaozhi Integration](docs/xiaozhi-integration.md)
 
-License: MIT · Version: 2.0.0 · Python · FastMCP · FastAPI
+License: MIT · Version: 2.1.0 · Python · FastMCP · FastAPI
 
 ---
 
@@ -70,10 +70,10 @@ flowchart LR
 | Obsidian | 保存记忆、创建/打开/追加笔记、每日笔记、搜索、最近记忆 |
 | Claude Code / Codex | 打开项目、发送指令、slash 命令、切模型、状态查询、继续、聚焦、停止 |
 | Project Alias | 从 `CC_ALLOWED_PROJECTS` 生成安全项目别名 |
-| Apps | 打开或关闭 `ALLOWED_APPS` 白名单内的 macOS App |
+| Apps | 打开、关闭、聚焦或查询 `ALLOWED_APPS` 白名单内的 macOS App |
 | Xcode | 打开项目、build、test、clean、查看最近错误 |
 | Browser / Finder / Clipboard | 浏览器打开搜索、Finder 定位、剪贴板读写 |
-| Music | 播放、暂停、下一首等语音友好控制 |
+| Music | 播放、暂停、下一首、网易云音乐搜索等语音友好控制 |
 | Pending Actions | 中风险动作先入队，确认后执行 |
 | Diagnostics | 健康检查、配置摘要、工具目录、会话清理 |
 | Observability | `X-Request-Id`、请求日志、工具调用耗时、错误追踪 |
@@ -197,6 +197,9 @@ POST /api/v1/dispatch
 | 让 Claude Code 继续 / 停止 | `continue_cc` / `stop_cc` |
 | 发送 slash 命令 / 切模型 | `cc_send_slash_command` / `cc_switch_model` |
 | 打开 / 关闭 App | `app_open` / `app_close` |
+| 聚焦 / 查询 App | `app_focus` / `app_status` |
+| 浏览器打开 / 搜索 | `browser_open` / `browser_search` |
+| 音乐控制 / 搜索 | `music_control` / `music_search` |
 | Xcode 构建 / 测试 / 清理 | `xcode_build` / `xcode_test` / `xcode_clean` |
 | 查看 Xcode 最近错误 | `xcode_last_errors` |
 | 创建 / 确认待执行动作 | `pending_create` / `pending_confirm` |

@@ -34,19 +34,26 @@ def music_control(settings: Settings, command: str = "toggle", app_name: str = "
     return ok({"app": allowed_app, "command": normalized}, "音乐操作完成。", "music command completed")
 
 
-def music_search(settings: Settings, query: str, app_name: str = "") -> dict:
+def music_search(settings: Settings, query: str, app_name: str = "", provider: str = "") -> dict:
     """Open a music search URL; useful when app-specific search scripting is unavailable."""
     from .browser import browser_open_url
 
     clean = query.strip()
     if not clean:
         return fail("music search query is empty", "歌曲或歌手名是空的。")
-    url = "https://music.apple.com/search?term=" + quote_plus(clean)
-    return browser_open_url(settings, url, app_name or _default_browser_for_music(settings))
+    normalized_provider = provider.strip().lower().replace("-", "_")
+    if not normalized_provider and app_name.strip() in {"网易云音乐", "NetEase Cloud Music"}:
+        normalized_provider = "netease"
+    if normalized_provider in {"netease", "netease_music", "网易云", "网易云音乐"}:
+        url = "https://music.163.com/#/search/m/?s=" + quote_plus(clean)
+    else:
+        url = "https://music.apple.com/search?term=" + quote_plus(clean)
+    browser_app = "" if app_name.strip() in {"网易云音乐", "NetEase Cloud Music", "Music", "Spotify"} else app_name
+    return browser_open_url(settings, url, browser_app or _default_browser_for_music(settings))
 
 
 def _default_music_app(settings: Settings) -> str:
-    for app in ("Music", "Spotify", "网易云音乐"):
+    for app in ("Music", "网易云音乐", "NetEase Cloud Music", "Spotify"):
         if app in settings.allowed_apps:
             return app
     return "Music"

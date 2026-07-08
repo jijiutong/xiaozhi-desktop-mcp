@@ -8,7 +8,7 @@
 
 [API](docs/api.md) · [Client Examples](docs/clients.md) · [Operations](docs/operations.md) · [Security](docs/security.md) · [Xiaozhi Integration](docs/xiaozhi-integration.md)
 
-License: MIT · Version: 1.0.0 · Python · FastMCP · FastAPI
+License: MIT · Version: 2.0.0 · Python · FastMCP · FastAPI
 
 ---
 
@@ -35,6 +35,20 @@ flowchart LR
 
 ---
 
+## Why This Exists
+
+语音助手和 LLM 真正接入桌面时，难点不是“能不能调用命令”，而是“能不能安全、稳定、可追踪地调用本机能力”。
+
+这个项目把桌面自动化里的风险收束成明确规则：
+
+- App、项目、Xcode、Obsidian 都有白名单或路径边界
+- 中风险动作先进入 pending action，再由用户确认
+- MCP Client 可以走标准协议，普通程序可以走 HTTP API
+- 每次请求都有 request id，方便从客户端追到工具调用
+- HTTP 暴露到非 localhost 时必须开启 token 鉴权
+
+---
+
 ## Transports
 
 | 入口 | 命令 | 默认地址 | 适合场景 |
@@ -43,7 +57,8 @@ flowchart LR
 | MCP Streamable HTTP | `xiaozhi-desktop-mcp-streamable` | `http://127.0.0.1:8766/mcp` | 支持 MCP over HTTP 的客户端 |
 | HTTP API | `xiaozhi-desktop-http` | `http://127.0.0.1:8765/api/v1` | Java / Python / Go / 普通后端服务 |
 
-如果你接的是标准 MCP Client，优先使用 `stdio` 或 `Streamable HTTP`。  
+如果你接的是标准 MCP Client，优先使用 `stdio` 或 `Streamable HTTP`。
+
 如果你只是从普通程序里调用桌面能力，使用 `/api/v1/dispatch`。
 
 ---

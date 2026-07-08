@@ -1,6 +1,6 @@
 [project]
 name = "xiaozhi-desktop-mcp"
-version = "1.0.0"
+version = "2.0.0"
 description = "Personal desktop workflow MCP tools for Xiaozhi: Obsidian memory, app launch, and safe local automation."
 readme = "README.md"
 requires-python = ">=3.10"

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 2.0.0 - 2026-07-08
+
+Major release that keeps `/api/v1/...` wire compatibility while making action
+metadata and medium-risk confirmation rules easier to evolve safely.
+
 ### Changed
 
 - Removed legacy `/tools/...` HTTP routes. HTTP clients now use only `/api/v1/dispatch`.
@@ -20,6 +25,7 @@
 - Added browser open/search, Music controls, Finder safe path open/reveal, and clipboard get/set capabilities through `desktop_intent`.
 - Added a shared action registry for API catalog metadata, risk levels, and pending-action parameter rules.
 - Centralized API v1 medium-risk confirmation handling through a shared pending-action helper.
+- Added registry consistency tests so API action metadata and dispatch handlers cannot drift silently.
 
 ## 1.0.0 - 2026-07-01
 

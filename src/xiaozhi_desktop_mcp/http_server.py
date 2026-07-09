@@ -14,6 +14,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from .api_v1 import actions_catalog as api_v1_actions_catalog, api_health as api_v1_health, dispatch as api_v1_dispatch
+from .api_v2 import (
+    ApiV2DispatchRequest,
+    actions_catalog as api_v2_actions_catalog,
+    dispatch as api_v2_dispatch,
+)
 from .config import load_settings
 
 app = FastAPI(title="Xiaozhi Desktop MCP HTTP Adapter")
@@ -95,6 +100,18 @@ def http_api_v1_actions() -> dict:
 def http_api_v1_dispatch(req: ApiV1DispatchRequest) -> dict:
     """Language-agnostic dispatch endpoint for Java, Python, Go, and other clients."""
     return api_v1_dispatch(settings, req.action, req.params, req.request_id)
+
+
+@app.get("/api/v2/actions")
+def http_api_v2_actions() -> dict:
+    """Return schema-rich API v2 action metadata."""
+    return api_v2_actions_catalog()
+
+
+@app.post("/api/v2/dispatch")
+def http_api_v2_dispatch(req: ApiV2DispatchRequest) -> dict:
+    """API v2 dispatch with policy and trace metadata around the stable v1 backend."""
+    return api_v2_dispatch(settings, req.action, req.params, req.request_id, req.client)
 
 
 def main() -> None:

@@ -9,6 +9,7 @@ class ActionSpec:
     risk: str
     params: dict[str, str]
     description: str
+    examples: tuple[dict, ...] = ()
     pending_action_type: str = ""
     pending_param_keys: frozenset[str] = field(default_factory=frozenset)
     pending_required_params: tuple[str, ...] = ()
@@ -25,6 +26,14 @@ class ActionSpec:
             entry["pending_action_type"] = self.pending_action_type
         return entry
 
+    def v2_entry(self) -> dict:
+        return {
+            **self.catalog_entry(),
+            "param_schema": _param_schema(self.params),
+            "policy": _policy_for(self),
+            "examples": list(self.examples),
+        }
+
 
 def api_action_specs() -> tuple[ActionSpec, ...]:
     return _API_ACTION_SPECS
@@ -40,6 +49,10 @@ def pending_spec(action_type: str) -> ActionSpec | None:
 
 def pending_action_types() -> frozenset[str]:
     return frozenset(_PENDING_SPECS_BY_TYPE)
+
+
+def api_action_spec(action: str) -> ActionSpec | None:
+    return _API_SPECS_BY_NAME.get(action.strip().lower().replace("-", "_"))
 
 
 def xcode_params() -> dict[str, str]:
@@ -59,6 +72,7 @@ def _action(
     params: dict[str, str],
     description: str,
     *,
+    examples: tuple[dict, ...] = (),
     pending_action_type: str = "",
     pending_param_keys: frozenset[str] | None = None,
     pending_required_params: tuple[str, ...] = (),
@@ -69,11 +83,44 @@ def _action(
         risk=risk,
         params=params,
         description=description,
+        examples=examples,
         pending_action_type=pending_action_type,
         pending_param_keys=pending_param_keys or frozenset(),
         pending_required_params=pending_required_params,
         pending_title=pending_title,
     )
+
+
+def _param_schema(params: dict[str, str]) -> dict:
+    required = []
+    properties = {}
+    for name, description in params.items():
+        clean_description = description.lower()
+        if "integer" in clean_description:
+            value_type = "integer"
+        elif "boolean" in clean_description:
+            value_type = "boolean"
+        elif "object" in clean_description:
+            value_type = "object"
+        else:
+            value_type = "string"
+        properties[name] = {"type": value_type, "description": description}
+        if "optional" not in clean_description:
+            required.append(name)
+    return {"type": "object", "properties": properties, "required": required}
+
+
+def _policy_for(spec: ActionSpec) -> dict:
+    if spec.pending_action_type:
+        return {
+            "default": "pending",
+            "risk": spec.risk,
+            "pending_action_type": spec.pending_action_type,
+            "confirm_param": "confirm",
+        }
+    if spec.risk == "low":
+        return {"default": "allow", "risk": spec.risk}
+    return {"default": "allow", "risk": spec.risk}
 
 
 _API_ACTION_SPECS = (
@@ -308,4 +355,5 @@ _PENDING_ACTION_SPECS = tuple(
     spec for spec in (*_API_ACTION_SPECS, *_EXTRA_PENDING_ACTION_SPECS) if spec.pending_action_type
 )
 
+_API_SPECS_BY_NAME = {spec.name: spec for spec in _API_ACTION_SPECS}
 _PENDING_SPECS_BY_TYPE = {spec.pending_action_type: spec for spec in _PENDING_ACTION_SPECS}

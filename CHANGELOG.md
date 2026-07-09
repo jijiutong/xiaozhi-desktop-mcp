@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 3.0.0-alpha.1 - 2026-07-09
+
+### Added
+
+- Added App alias and process alias configuration through `desktop-mcp.yaml`, `APP_ALIASES`, and `APP_PROCESS_ALIASES`.
+- Added API v2 alpha endpoints:
+  - `GET /api/v2/actions`
+  - `POST /api/v2/dispatch`
+- Added schema-rich action metadata with parameter schema, policy, examples, and v1 backend compatibility markers.
+- Added v2 dispatch trace metadata while preserving the stable v1 execution backend.
+
+### Changed
+
+- App open/focus/status/music controls now resolve configured aliases before allowlist checks.
+- AppleScript App string interpolation now uses explicit string quoting.
+- Config summaries include App alias and process alias counts.
+
 ## 2.1.0 - 2026-07-08
 
 ### Added

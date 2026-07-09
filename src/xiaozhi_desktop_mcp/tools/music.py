@@ -5,7 +5,8 @@ from urllib.parse import quote_plus
 
 from ..config import Settings
 from ..responses import fail, ok
-from ..safety import SafetyError, ensure_allowed_app
+from ..safety import SafetyError
+from .apps import applescript_quote, resolve_app_name
 
 _COMMANDS = {
     "play": "play",
@@ -24,10 +25,10 @@ def music_control(settings: Settings, command: str = "toggle", app_name: str = "
         return fail(f"unsupported music command: {command}", "这个音乐控制命令还不支持。")
     app = app_name.strip() or _default_music_app(settings)
     try:
-        allowed_app = ensure_allowed_app(app, settings.allowed_apps)
+        allowed_app = resolve_app_name(settings, app)
     except SafetyError as exc:
         return fail(str(exc), f"{app or '音乐 App'} 不在白名单里，我没有操作。")
-    script = f'tell application "{allowed_app}" to {_COMMANDS[normalized]}'
+    script = f"tell application {applescript_quote(allowed_app)} to {_COMMANDS[normalized]}"
     completed = subprocess.run(["osascript", "-e", script], check=False, capture_output=True, text=True)
     if completed.returncode != 0:
         return fail(completed.stderr.strip() or completed.stdout.strip(), "音乐控制没有成功。", {"app": allowed_app})

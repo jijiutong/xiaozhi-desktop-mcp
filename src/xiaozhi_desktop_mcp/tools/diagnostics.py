@@ -55,6 +55,8 @@ def config_summary(settings: Settings) -> dict:
         "desktop_config_path": str(settings.desktop_config_path),
         "default_project_root": settings.default_project_root,
         "allowed_apps": sorted(settings.allowed_apps),
+        "app_alias_count": len(settings.app_aliases),
+        "app_process_alias_count": len(settings.app_process_aliases),
         "cc_allowed_projects": sorted(str(path) for path in settings.cc_allowed_projects),
         "cc_allowed_clis": sorted(settings.cc_allowed_clis),
         "cc_default_cli": settings.cc_default_cli,

@@ -5,12 +5,13 @@ from fastapi.testclient import TestClient
 from xiaozhi_desktop_mcp.http_server import app
 
 
-def test_http_exposes_api_v1_only(monkeypatch):
+def test_http_exposes_versioned_apis_without_legacy_tools(monkeypatch):
     monkeypatch.delenv("DESKTOP_MCP_AUTH_TOKEN", raising=False)
     client = TestClient(app)
 
     assert client.get("/health").status_code == 200
     assert client.get("/api/v1/actions").status_code == 200
+    assert client.get("/api/v2/actions").status_code == 200
     assert client.post("/tools/desktop/ask-cc", json={}).status_code == 404
 
 

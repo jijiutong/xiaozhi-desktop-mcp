@@ -16,7 +16,7 @@
 
 不要把它做成新的小智服务器，也不要在这里实现 LLM/RAG/ASR/TTS。
 
-当前稳定版本是 `2.1.0`。2.x 继续保持 `/api/v1/...` 响应 envelope 兼容，不随意改 action 名和字段名。
+当前开发版本是 `3.0.0-alpha.1`。3.0 alpha 继续保持 `/api/v1/...` 响应 envelope 兼容，不随意改 action 名和字段名；新客户端可以试用 `/api/v2/actions` 和 `/api/v2/dispatch`。
 
 ## 当前重要文件
 

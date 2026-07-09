@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+try:
+    import yaml
+except ModuleNotFoundError:  # pragma: no cover - exercised when PyYAML is absent in lightweight envs
+    yaml = None
 
 load_dotenv()
 
@@ -23,6 +29,8 @@ class Settings:
     desktop_config_path: Path
     default_project_root: str
     allowed_apps: frozenset[str]
+    app_aliases: dict[str, str]
+    app_process_aliases: dict[str, tuple[str, ...]]
     cc_allowed_projects: frozenset[Path]
     cc_allowed_clis: frozenset[str]
     cc_default_cli: str
@@ -49,6 +57,30 @@ def _split_paths(value: str) -> frozenset[Path]:
     return frozenset(Path(item).expanduser().resolve() for item in _split_csv(value))
 
 
+def _split_mapping(value: str) -> dict[str, str]:
+    """Parse comma-separated key=value pairs into a normalized mapping."""
+    result: dict[str, str] = {}
+    for item in value.split(","):
+        if "=" not in item:
+            continue
+        key, raw_value = item.split("=", 1)
+        clean_key = key.strip().lower()
+        clean_value = raw_value.strip()
+        if clean_key and clean_value:
+            result[clean_key] = clean_value
+    return result
+
+
+def _split_list_mapping(value: str) -> dict[str, tuple[str, ...]]:
+    """Parse key=a|b,key2=c process alias mappings."""
+    result: dict[str, tuple[str, ...]] = {}
+    for key, raw_value in _split_mapping(value).items():
+        values = tuple(item.strip() for item in raw_value.split("|") if item.strip())
+        if values:
+            result[key] = values
+    return result
+
+
 def _bool_env(name: str, default: bool = False) -> bool:
     """读取布尔环境变量，兼容 true/1/yes/on。"""
     value = os.getenv(name)
@@ -63,6 +95,51 @@ def _int_env(name: str, default: int) -> int:
         return int(os.getenv(name, str(default)))
     except ValueError:
         return default
+
+
+def _load_desktop_config(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    try:
+        raw = path.read_text(encoding="utf-8")
+        if yaml is not None:
+            content = yaml.safe_load(raw)
+        else:
+            content = json.loads(raw)
+    except (OSError, ValueError):
+        return {}
+    except Exception:
+        return {}
+    return content if isinstance(content, dict) else {}
+
+
+def _yaml_str_mapping(config: dict, key: str) -> dict[str, str]:
+    raw = config.get(key, {})
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        str(item_key).strip().lower(): str(item_value).strip()
+        for item_key, item_value in raw.items()
+        if item_value
+    }
+
+
+def _yaml_list_mapping(config: dict, key: str) -> dict[str, tuple[str, ...]]:
+    raw = config.get(key, {})
+    if not isinstance(raw, dict):
+        return {}
+    result: dict[str, tuple[str, ...]] = {}
+    for item_key, item_value in raw.items():
+        clean_key = str(item_key).strip().lower()
+        if isinstance(item_value, str):
+            values = tuple(part.strip() for part in item_value.split("|") if part.strip())
+        elif isinstance(item_value, list):
+            values = tuple(str(part).strip() for part in item_value if str(part).strip())
+        else:
+            values = ()
+        if clean_key and values:
+            result[clean_key] = values
+    return result
 
 
 def load_settings() -> Settings:
@@ -84,9 +161,34 @@ def load_settings() -> Settings:
     if not desktop_config_path.is_absolute():
         desktop_config_path = Path.cwd() / desktop_config_path
     desktop_config_path = desktop_config_path.resolve()
+    desktop_config = _load_desktop_config(desktop_config_path)
     default_project_root = os.getenv("DEFAULT_PROJECT_ROOT", "")
     default_allowed_apps = "Obsidian,Xcode,Google Chrome,Safari,Microsoft Edge,Arc,Music,网易云音乐,Finder,Terminal"
     allowed_apps = _split_csv(os.getenv("ALLOWED_APPS", default_allowed_apps))
+    default_app_aliases = {
+        "browser": "Google Chrome",
+        "chrome": "Google Chrome",
+        "edge": "Microsoft Edge",
+        "netease": "网易云音乐",
+        "netease_music": "网易云音乐",
+        "网易云": "网易云音乐",
+        "music": "Music",
+    }
+    default_process_aliases = {
+        "网易云音乐": ("网易云音乐", "NetEaseMusic", "NeteaseMusic"),
+        "Google Chrome": ("Google Chrome",),
+        "Microsoft Edge": ("Microsoft Edge",),
+    }
+    app_aliases = {
+        **default_app_aliases,
+        **_yaml_str_mapping(desktop_config, "app_aliases"),
+        **_split_mapping(os.getenv("APP_ALIASES", "")),
+    }
+    app_process_aliases = {
+        **default_process_aliases,
+        **_yaml_list_mapping(desktop_config, "app_process_aliases"),
+        **_split_list_mapping(os.getenv("APP_PROCESS_ALIASES", "")),
+    }
 
     # cc/Claude Code/Codex 会话配置：默认能玩，后续可以通过 .env 收紧。
     if default_project_root:
@@ -115,6 +217,8 @@ def load_settings() -> Settings:
         desktop_config_path=desktop_config_path,
         default_project_root=default_project_root,
         allowed_apps=allowed_apps,
+        app_aliases=app_aliases,
+        app_process_aliases=app_process_aliases,
         cc_allowed_projects=cc_allowed_projects,
         cc_allowed_clis=cc_allowed_clis,
         cc_default_cli=cc_default_cli,

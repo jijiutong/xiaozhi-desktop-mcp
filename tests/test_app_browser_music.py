@@ -24,6 +24,21 @@ def test_app_focus_uses_allowlisted_app(settings, monkeypatch):
     assert 'tell application "Obsidian" to activate' in calls[0]
 
 
+def test_app_focus_resolves_alias(settings, monkeypatch):
+    calls = []
+
+    def fake_run(command, **_kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    result = focus_app(settings, "chrome")
+
+    assert result["success"] is True
+    assert 'tell application "Google Chrome" to activate' in calls[0]
+
+
 def test_app_status_reports_running(settings, monkeypatch):
     def fake_run(command, **_kwargs):
         return subprocess.CompletedProcess(command, 0, "true\n", "")
@@ -34,6 +49,23 @@ def test_app_status_reports_running(settings, monkeypatch):
 
     assert result["success"] is True
     assert result["running"] is True
+
+
+def test_app_status_uses_process_aliases(settings, monkeypatch):
+    calls = []
+
+    def fake_run(command, **_kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, "false\n", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    result = app_status(settings, "netease")
+
+    assert result["success"] is True
+    assert result["app"] == "网易云音乐"
+    assert "NetEaseMusic" in result["process_names"]
+    assert "NetEaseMusic" in calls[0][2]
 
 
 def test_browser_open_rejects_non_http_url(settings):

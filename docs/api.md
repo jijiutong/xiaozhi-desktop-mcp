@@ -14,11 +14,15 @@ http://127.0.0.1:8765
 GET  /api/v1/health
 GET  /api/v1/actions
 POST /api/v1/dispatch
+GET  /api/v2/actions
+POST /api/v2/dispatch
 ```
 
 HTTP clients should use `POST /api/v1/dispatch`. Legacy `/tools/...` HTTP routes were removed to keep one safety policy.
 
 New voice clients should prefer `desktop_intent` for broad desktop workflows, then fall back to specific actions when they need exact control.
+
+API v2 is an alpha compatibility layer over the v1 execution backend. It adds schema-rich action discovery, policy metadata, and dispatch trace fields while preserving the v1 response envelope.
 
 If `DESKTOP_MCP_AUTH_TOKEN` is set, protected API routes require either:
 
@@ -81,6 +85,40 @@ On failure:
 ```
 
 Clients should display or speak `spoken_message` on success and `error_spoken_message` on failure.
+
+## API v2 Alpha
+
+`POST /api/v2/dispatch` accepts the same `action`, `params`, and `request_id` fields as v1, plus an optional `client` string:
+
+```json
+{
+  "request_id": "client-generated-id",
+  "client": "xiaozhi-java",
+  "action": "browser_search",
+  "params": {
+    "query": "desktop mcp",
+    "app_name": "chrome"
+  }
+}
+```
+
+The response keeps the v1 envelope and adds:
+
+```json
+{
+  "api_version": "v2",
+  "policy": {
+    "default": "allow",
+    "risk": "low"
+  },
+  "trace": {
+    "client": "xiaozhi-java",
+    "requested_action": "browser_search",
+    "normalized_action": "browser_search",
+    "backend": "api_v1"
+  }
+}
+```
 
 ## Common Actions
 
@@ -158,6 +196,8 @@ system   open, reveal, clipboard_get, clipboard_set
 ```
 
 Use `GET /api/v1/actions` for machine-readable parameters and risk levels.
+
+Use `GET /api/v2/actions` for parameter schemas, policy metadata, examples, and v1 compatibility markers.
 
 Medium-risk actions such as `ask_cc`, `ask_cc_project`, `continue_cc`, `stop_cc`, `app_close`, `cc_send_slash_command`, `cc_switch_model`, `xcode_build`, `xcode_test`, and `xcode_clean` create a pending action by default. Pass `"confirm": true` only when the client has already received explicit user confirmation.
 

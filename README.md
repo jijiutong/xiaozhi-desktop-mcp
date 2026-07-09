@@ -8,7 +8,7 @@
 
 [API](docs/api.md) · [Client Examples](docs/clients.md) · [Operations](docs/operations.md) · [Security](docs/security.md) · [Xiaozhi Integration](docs/xiaozhi-integration.md)
 
-License: MIT · Version: 2.1.0 · Python · FastMCP · FastAPI
+License: MIT · Version: 3.0.0-alpha.1 · Python · FastMCP · FastAPI
 
 ---
 
@@ -55,11 +55,14 @@ flowchart LR
 | --- | --- | --- | --- |
 | MCP stdio | `xiaozhi-desktop-mcp` | 标准输入输出 | Claude Desktop、小智 bridge、本机 MCP client |
 | MCP Streamable HTTP | `xiaozhi-desktop-mcp-streamable` | `http://127.0.0.1:8766/mcp` | 支持 MCP over HTTP 的客户端 |
-| HTTP API | `xiaozhi-desktop-http` | `http://127.0.0.1:8765/api/v1` | Java / Python / Go / 普通后端服务 |
+| HTTP API v1 | `xiaozhi-desktop-http` | `http://127.0.0.1:8765/api/v1` | Java / Python / Go / 稳定客户端 |
+| HTTP API v2 alpha | `xiaozhi-desktop-http` | `http://127.0.0.1:8765/api/v2` | schema / policy / trace 能力发现 |
 
 如果你接的是标准 MCP Client，优先使用 `stdio` 或 `Streamable HTTP`。
 
 如果你只是从普通程序里调用桌面能力，使用 `/api/v1/dispatch`。
+
+如果你在做新客户端，可以先读 `/api/v2/actions` 获取参数 schema 和策略说明，再按需调用 `/api/v2/dispatch`。
 
 ---
 
@@ -104,6 +107,8 @@ CC_ALLOWED_PROJECTS=/path/to/your/project
 XCODE_ALLOWED_PROJECTS=/path/to/your/project
 
 ALLOWED_APPS=Obsidian,Xcode,Google Chrome,Safari,Music,Finder,Terminal
+APP_ALIASES=chrome=Google Chrome,netease=网易云音乐,网易云=网易云音乐
+APP_PROCESS_ALIASES=网易云音乐=网易云音乐|NetEaseMusic|NeteaseMusic
 ```
 
 启动普通 HTTP API：
@@ -117,6 +122,7 @@ xiaozhi-desktop-http
 ```bash
 curl http://127.0.0.1:8765/api/v1/health
 curl http://127.0.0.1:8765/api/v1/actions
+curl http://127.0.0.1:8765/api/v2/actions
 ```
 
 启动标准 MCP Streamable HTTP：

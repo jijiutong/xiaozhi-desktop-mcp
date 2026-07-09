@@ -30,6 +30,8 @@ def settings(tmp_path: Path) -> Settings:
         desktop_config_path=tmp_path / "desktop-mcp.yaml",
         default_project_root=str(project),
         allowed_apps=frozenset({"Obsidian", "Terminal", "Google Chrome", "Music", "网易云音乐"}),
+        app_aliases={"chrome": "Google Chrome", "netease": "网易云音乐", "网易云": "网易云音乐"},
+        app_process_aliases={"网易云音乐": ("网易云音乐", "NetEaseMusic")},
         cc_allowed_projects=frozenset({project}),
         cc_allowed_clis=frozenset({"claude", "codex"}),
         cc_default_cli="claude",

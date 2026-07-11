@@ -9,7 +9,19 @@ from ..responses import ok
 DEFAULT_CATEGORIES: dict[str, dict[str, Any]] = {
     "music": {
         "description": "Music playback controls.",
-        "intents": ["open", "play", "pause", "toggle", "next", "previous", "search"],
+        "intents": [
+            "open",
+            "play",
+            "pause",
+            "toggle",
+            "next",
+            "previous",
+            "search",
+            "search_app",
+            "status",
+            "volume",
+            "capabilities",
+        ],
         "default_app": "Music",
     },
     "docs": {
@@ -29,13 +41,18 @@ DEFAULT_CATEGORIES: dict[str, dict[str, Any]] = {
     },
     "browser": {
         "description": "Browser navigation and search.",
-        "intents": ["open", "search"],
+        "intents": ["open", "search", "tabs", "current", "control", "capabilities"],
         "default_app": "Google Chrome",
     },
     "system": {
         "description": "Finder and clipboard utilities.",
         "intents": ["open", "reveal", "clipboard_get", "clipboard_set"],
         "default_app": "Finder",
+    },
+    "app": {
+        "description": "Allowlisted application lifecycle and capabilities.",
+        "intents": ["open", "focus", "status", "close", "capabilities"],
+        "default_app": "Obsidian",
     },
 }
 

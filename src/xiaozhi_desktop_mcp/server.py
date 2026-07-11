@@ -19,6 +19,7 @@ from mcp.server.fastmcp import FastMCP
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from .api_v2 import dispatch as api_v2_dispatch
 from .config import load_settings
 from .tools.apps import close_app as close_app_impl, open_app as open_app_impl
 from .tools.catalog import tool_catalog as desktop_tool_catalog_impl
@@ -535,15 +536,21 @@ def desktop_intent(category: str, intent: str, params: dict | None = None) -> di
 
 
 @mcp_tool()
+def desktop_dispatch_v2(action: str, params: dict | None = None, client: str = "mcp") -> dict:
+    """统一 v2 桌面动作入口：执行 Schema 校验、风险策略、审计和安全 dispatch。"""
+    return api_v2_dispatch(settings, action, params or {}, "", client)
+
+
+@mcp_tool()
 def pending_action_create(action_type: str, params: dict | None = None, title: str = "") -> dict:
     """创建一个待确认动作；只允许白名单动作类型，不会立即执行。"""
-    return pending_action_create_impl(action_type, params, title)
+    return pending_action_create_impl(action_type, params, title, settings=settings)
 
 
 @mcp_tool()
 def pending_action_list(status: str = "pending") -> dict:
     """列出待确认动作；status 为空时列出全部。"""
-    return pending_action_list_impl(status)
+    return pending_action_list_impl(status, settings=settings)
 
 
 @mcp_tool()
@@ -555,7 +562,7 @@ def pending_action_confirm(action_id: str) -> dict:
 @mcp_tool()
 def pending_action_cancel(action_id: str) -> dict:
     """取消一个待确认动作，不执行。"""
-    return pending_action_cancel_impl(action_id)
+    return pending_action_cancel_impl(action_id, settings=settings)
 
 
 def main() -> None:

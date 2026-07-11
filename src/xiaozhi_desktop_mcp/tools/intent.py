@@ -4,13 +4,27 @@ from typing import Any
 
 from ..config import Settings
 from ..responses import fail
-from .apps import app_status, close_app, focus_app, open_app
-from .browser import browser_open_url, browser_search
+from .apps import app_capabilities, app_status, close_app, focus_app, open_app
+from .browser import (
+    browser_capabilities,
+    browser_control,
+    browser_current,
+    browser_open_url,
+    browser_search,
+    browser_tabs,
+)
 from .cc_session import send_slash_command, switch_model
 from .clipboard import clipboard_get, clipboard_set
 from .desktop_config import category_registry
 from .finder import finder_open_path
-from .music import music_control, music_search
+from .music import (
+    music_capabilities,
+    music_control,
+    music_search,
+    music_search_app,
+    music_set_volume,
+    music_status,
+)
 from .obsidian import append_daily_note, append_note, create_note, open_note, save_memory, search_notes
 from .pending_actions import create_pending_action
 from .projects import ask_cc_project
@@ -64,7 +78,7 @@ def _app_open(settings: Settings, params: dict[str, Any]) -> dict:
 def _app_close(settings: Settings, params: dict[str, Any]) -> dict:
     pending_params = {"app_name": _str(params, "app_name") or _str(params, "app")}
     if not _bool(params, "confirm"):
-        return create_pending_action("app_close", pending_params)
+        return create_pending_action("app_close", pending_params, settings=settings)
     return close_app(settings, pending_params["app_name"])
 
 
@@ -74,6 +88,10 @@ def _app_focus(settings: Settings, params: dict[str, Any]) -> dict:
 
 def _app_status(settings: Settings, params: dict[str, Any]) -> dict:
     return app_status(settings, _str(params, "app_name") or _str(params, "app"))
+
+
+def _app_capabilities(settings: Settings, params: dict[str, Any]) -> dict:
+    return app_capabilities(settings, _str(params, "app_name") or _str(params, "app"))
 
 
 def _docs_create(settings: Settings, params: dict[str, Any]) -> dict:
@@ -106,7 +124,7 @@ def _ai_send(settings: Settings, params: dict[str, Any]) -> dict:
             "allow_frontmost": _bool(params, "allow_frontmost", False),
         }
         if not _bool(params, "confirm"):
-            return create_pending_action("desktop_ask_cc_project", pending_params)
+            return create_pending_action("desktop_ask_cc_project", pending_params, settings=settings)
         return ask_cc_project(
             settings,
             pending_params["project"],
@@ -127,7 +145,7 @@ def _ai_send(settings: Settings, params: dict[str, Any]) -> dict:
         "allow_frontmost": _bool(params, "allow_frontmost", False),
     }
     if not _bool(params, "confirm"):
-        return create_pending_action("desktop_ask_cc", pending_params)
+        return create_pending_action("desktop_ask_cc", pending_params, settings=settings)
     return ask_cc(
         settings,
         pending_params["text"],
@@ -148,7 +166,7 @@ def _ai_slash(settings: Settings, params: dict[str, Any]) -> dict:
         "allow_frontmost": _bool(params, "allow_frontmost", False),
     }
     if not _bool(params, "confirm"):
-        return create_pending_action("cc_send_slash_command", pending_params)
+        return create_pending_action("cc_send_slash_command", pending_params, settings=settings)
     return send_slash_command(
         settings,
         pending_params["command"],
@@ -166,7 +184,7 @@ def _ai_model(settings: Settings, params: dict[str, Any]) -> dict:
         "allow_frontmost": _bool(params, "allow_frontmost", False),
     }
     if not _bool(params, "confirm"):
-        return create_pending_action("cc_switch_model", pending_params)
+        return create_pending_action("cc_switch_model", pending_params, settings=settings)
     return switch_model(
         settings,
         pending_params["model"],
@@ -185,7 +203,7 @@ def _dev_xcode(settings: Settings, params: dict[str, Any], action: str) -> dict:
         "destination": _str(params, "destination"),
     }
     if action in {"build", "test", "clean"} and not _bool(params, "confirm"):
-        return create_pending_action(f"xcode_{action}", pending_params)
+        return create_pending_action(f"xcode_{action}", pending_params, settings=settings)
     runner = {"open": open_xcode_project, "build": xcode_build, "test": xcode_test, "clean": xcode_clean}[action]
     if action == "open":
         return runner(settings, pending_params["project_path"], pending_params["xcode_path"])
@@ -222,6 +240,25 @@ def _music_previous(settings: Settings, params: dict[str, Any]) -> dict:
 
 def _music_search(settings: Settings, params: dict[str, Any]) -> dict:
     return music_search(settings, _str(params, "query"), _str(params, "browser"), _str(params, "provider"))
+
+
+def _music_search_app(settings: Settings, params: dict[str, Any]) -> dict:
+    pending_params = {"query": _str(params, "query"), "app_name": _music_app(params)}
+    if not _bool(params, "confirm"):
+        return create_pending_action("music_search_app", pending_params, settings=settings)
+    return music_search_app(settings, **pending_params)
+
+
+def _music_status(settings: Settings, params: dict[str, Any]) -> dict:
+    return music_status(settings, _music_app(params))
+
+
+def _music_volume(settings: Settings, params: dict[str, Any]) -> dict:
+    return music_set_volume(settings, _int(params, "volume", 50), _music_app(params))
+
+
+def _music_capabilities(settings: Settings, params: dict[str, Any]) -> dict:
+    return music_capabilities(settings, _music_app(params))
 
 
 def _docs_remember(settings: Settings, params: dict[str, Any]) -> dict:
@@ -285,6 +322,30 @@ def _browser_search(settings: Settings, params: dict[str, Any]) -> dict:
     return browser_search(settings, _str(params, "query"), _browser_app(params), _str(params, "engine", "google"))
 
 
+def _browser_tabs(settings: Settings, params: dict[str, Any]) -> dict:
+    return browser_tabs(settings, _browser_app(params))
+
+
+def _browser_current(settings: Settings, params: dict[str, Any]) -> dict:
+    return browser_current(settings, _browser_app(params))
+
+
+def _browser_capabilities(settings: Settings, params: dict[str, Any]) -> dict:
+    return browser_capabilities(settings, _browser_app(params))
+
+
+def _browser_control(settings: Settings, params: dict[str, Any]) -> dict:
+    pending_params = {
+        "command": _str(params, "command"),
+        "app_name": _browser_app(params),
+        "window_index": _int(params, "window_index", 1),
+        "tab_index": _int(params, "tab_index", 1),
+    }
+    if not _bool(params, "confirm"):
+        return create_pending_action("browser_control", pending_params, settings=settings)
+    return browser_control(settings, **pending_params)
+
+
 def _str(params: dict[str, Any], key: str, default: str = "") -> str:
     return str(params.get(key, default))
 
@@ -310,6 +371,7 @@ _HANDLERS = {
     ("app", "close"): _app_close,
     ("app", "focus"): _app_focus,
     ("app", "status"): _app_status,
+    ("app", "capabilities"): _app_capabilities,
     ("music", "open"): _music_open,
     ("music", "play"): _music_play,
     ("music", "pause"): _music_pause,
@@ -317,6 +379,10 @@ _HANDLERS = {
     ("music", "next"): _music_next,
     ("music", "previous"): _music_previous,
     ("music", "search"): _music_search,
+    ("music", "search_app"): _music_search_app,
+    ("music", "status"): _music_status,
+    ("music", "volume"): _music_volume,
+    ("music", "capabilities"): _music_capabilities,
     ("docs", "remember"): _docs_remember,
     ("docs", "search"): _docs_search,
     ("docs", "create"): _docs_create,
@@ -338,6 +404,10 @@ _HANDLERS = {
     ("dev", "errors"): lambda settings, params: xcode_last_errors(_int(params, "limit", 20)),
     ("browser", "open"): _browser_open,
     ("browser", "search"): _browser_search,
+    ("browser", "tabs"): _browser_tabs,
+    ("browser", "current"): _browser_current,
+    ("browser", "control"): _browser_control,
+    ("browser", "capabilities"): _browser_capabilities,
     ("system", "open"): lambda settings, params: finder_open_path(settings, _str(params, "path"), False),
     ("system", "reveal"): lambda settings, params: finder_open_path(settings, _str(params, "path"), True),
     ("system", "clipboard_get"): lambda settings, params: clipboard_get(),

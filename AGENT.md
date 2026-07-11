@@ -16,7 +16,7 @@
 
 不要把它做成新的小智服务器，也不要在这里实现 LLM/RAG/ASR/TTS。
 
-当前开发版本是 `3.0.0-alpha.1`。3.0 alpha 继续保持 `/api/v1/...` 响应 envelope 兼容，不随意改 action 名和字段名；新客户端可以试用 `/api/v2/actions` 和 `/api/v2/dispatch`。
+当前稳定版本是 `3.0.0`。继续保持 `/api/v1/...` 响应 envelope 兼容，不随意改 action 名和字段名；新客户端优先使用 `/api/v2/actions` 和 `/api/v2/dispatch`。
 
 ## 当前重要文件
 
@@ -29,6 +29,15 @@ src/xiaozhi_desktop_mcp/api_v1.py
 
 src/xiaozhi_desktop_mcp/action_registry.py
 API action、风险等级、pending action 参数规则的统一元数据来源。
+
+src/xiaozhi_desktop_mcp/api_v2.py
+Schema 校验、风险策略、稳定错误码、trace 和脱敏审计入口。
+
+src/xiaozhi_desktop_mcp/storage.py
+SQLite 状态库：pending actions、workflows、audit events。
+
+src/xiaozhi_desktop_mcp/workflows_v2.py
+可持久化、可暂停确认、可恢复和取消的多步骤工作流。
 
 src/xiaozhi_desktop_mcp/safety.py
 路径、App、CLI、slash policy 等安全边界。
@@ -58,7 +67,13 @@ src/xiaozhi_desktop_mcp/tools/diagnostics.py
 环境自检和脱敏配置摘要，只读检查，不启动 Claude Code，不执行项目命令。
 
 src/xiaozhi_desktop_mcp/tools/pending_actions.py
-进程内待确认动作队列。确认执行只 dispatch 到白名单里的现有工具，不支持任意 shell。
+SQLite 待确认动作生命周期。包含 TTL、原子 claim、防重复执行；只 dispatch 到白名单工具。
+
+src/xiaozhi_desktop_mcp/tools/browser_drivers.py
+Chromium/Safari 显式标签页 Driver，不提供任意 JavaScript 或坐标点击。
+
+src/xiaozhi_desktop_mcp/tools/music_drivers.py
+Apple Music/网易云音乐显式 Driver；网易云 UI 输入动作必须确认。
 
 src/xiaozhi_desktop_mcp/tools/catalog.py
 给小智/Java 侧看的工具目录，帮助选择高层 `desktop_*` 入口。
@@ -79,13 +94,15 @@ Java 侧桥接文件：
 - 默认能玩，配置能锁。
 - 不新增任意 shell 执行能力。
 - 工具返回保持旧字段兼容，同时给小智播报用 `spoken_message` / `error_spoken_message`。
-- 不做复杂摘要，不做日志落盘，除非用户明确要求。
+- 审计只记录参数名和执行元数据，不落参数值、token、笔记正文或搜索内容。
 - review/fix/test/git status 不需要单独工具，直接用 `cc_send_instruction` 输入中文给 Claude/Codex。
 - `/init`、`/compact`、`/clear`、`/model` 不需要单独包装，走 `cc_send_slash_command` 或 `cc_switch_model`。
 - 小智/Java 后端优先使用 `desktop_*` wrapper；底层 `cc_*` 工具主要用于精细控制和调试。
 - Java/Python/Go 等 HTTP 客户端统一使用 `/api/v1/dispatch`。
 - 新增 API v1 action 时，优先更新 `action_registry.py`，再接入 `api_v1.py` 的 `_ACTION_HANDLERS`。
 - 中风险动作需要在 `action_registry.py` 声明 `pending_action_type`、允许参数和必填参数。
+- API v2 不信任 `confirm=true`；中风险动作必须创建 pending action 后单独确认。
+- 新 App 能力优先新增显式 Driver 和 capabilities，不做任意坐标点击。
 - 新增或修改公共接口时同步 `docs/api.md`、必要时同步 `docs/clients.md` 和 `CHANGELOG.md`。
 - 先保持工具少而通用，不要把每句话都做成一个 action。
 
@@ -207,7 +224,7 @@ mvn -pl xiaozhi-server -am -DskipTests compile
 - 排障优先调用 `desktop_health_detail`，再看 `desktop_config_summary`。
 - Java/小智需要能力说明时调用 `desktop_tool_catalog`。
 - 语音里用户说项目名时优先用 `desktop_ask_cc_project` 或 `desktop_open_cc_project_named`；项目别名来自 allowed project 的目录名。
-- pending action 当前只存在内存里，服务重启会清空；允许动作类型在 `pending_actions.py` 的 `ALLOWED_ACTION_TYPES`。
+- pending action、workflow 和 audit 存在 `DESKTOP_MCP_STATE_DB`；确认动作必须保持原子、单次和可过期。
 - Obsidian 搜索只读 `.md` 文件，跳过隐藏目录，返回数量和片段长度都有上限。
 - 改了 HTTP/MCP 工具后，需要重启 `xiaozhi-desktop-http`。
 - 改了 Java 工具后，需要重启 Java server/dialogue。

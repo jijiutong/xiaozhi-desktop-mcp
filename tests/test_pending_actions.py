@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import subprocess
+from dataclasses import replace
+
 from xiaozhi_desktop_mcp.api_v1 import actions_catalog, dispatch
-from xiaozhi_desktop_mcp.tools.pending_actions import create_pending_action
+from xiaozhi_desktop_mcp.tools.pending_actions import create_pending_action, list_pending_actions
 
 
 def test_pending_create_rejects_empty_text():
@@ -71,6 +74,49 @@ def test_api_app_close_creates_pending_action(settings):
 
     assert result["success"] is True
     assert result["data"]["action"]["action_type"] == "app_close"
+
+
+def test_pending_actions_survive_process_memory_reset(settings):
+    created = dispatch(settings, "app_close", {"app_name": "Obsidian"}, "req-persist")
+    action_id = created["data"]["action"]["action_id"]
+
+    from xiaozhi_desktop_mcp.tools import pending_actions
+
+    pending_actions._pending_actions.clear()
+    listed = list_pending_actions("pending", settings=settings)
+
+    assert any(action["action_id"] == action_id for action in listed["actions"])
+
+
+def test_pending_action_can_only_be_confirmed_once(settings, monkeypatch):
+    calls = []
+
+    def fake_run(command, **_kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    created = dispatch(settings, "app_close", {"app_name": "Obsidian"}, "req-once")
+    action_id = created["data"]["action"]["action_id"]
+
+    first = dispatch(settings, "pending_confirm", {"action_id": action_id}, "confirm-1")
+    second = dispatch(settings, "pending_confirm", {"action_id": action_id}, "confirm-2")
+
+    assert first["success"] is True
+    assert second["success"] is False
+    assert "already completed" in second["error"]
+    assert len(calls) == 1
+
+
+def test_pending_action_expires_before_execution(settings):
+    expiring_settings = replace(settings, pending_ttl_seconds=-1)
+    created = dispatch(expiring_settings, "app_close", {"app_name": "Obsidian"}, "req-expire")
+    action_id = created["data"]["action"]["action_id"]
+
+    result = dispatch(expiring_settings, "pending_confirm", {"action_id": action_id}, "confirm-expired")
+
+    assert result["success"] is False
+    assert "already expired" in result["error"]
 
 
 def test_api_app_close_confirm_executes_immediately(settings, monkeypatch):

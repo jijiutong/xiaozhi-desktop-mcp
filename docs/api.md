@@ -22,7 +22,7 @@ HTTP clients should use `POST /api/v1/dispatch`. Legacy `/tools/...` HTTP routes
 
 New voice clients should prefer `desktop_intent` for broad desktop workflows, then fall back to specific actions when they need exact control.
 
-API v2 is an alpha compatibility layer over the v1 execution backend. It adds schema-rich action discovery, policy metadata, and dispatch trace fields while preserving the v1 response envelope.
+API v2 is the recommended execution entry for new clients. It performs strict parameter validation, policy enforcement, stable error mapping, trace metadata, and redacted audit recording while preserving the v1 response envelope.
 
 If `DESKTOP_MCP_AUTH_TOKEN` is set, protected API routes require either:
 
@@ -86,7 +86,7 @@ On failure:
 
 Clients should display or speak `spoken_message` on success and `error_spoken_message` on failure.
 
-## API v2 Alpha
+## API v2
 
 `POST /api/v2/dispatch` accepts the same `action`, `params`, and `request_id` fields as v1, plus an optional `client` string:
 
@@ -120,6 +120,10 @@ The response keeps the v1 envelope and adds:
 }
 ```
 
+Failed v2 responses include a stable `error_code` such as `INVALID_PARAMS`, `POLICY_DENIED`, `PERMISSION_DENIED`, `NOT_FOUND`, `CONFLICT`, `TIMEOUT`, or `EXECUTION_FAILED`.
+
+API v2 never treats `confirm=true` as authorization for medium-risk actions. It always creates a persistent pending action. Confirm it separately with `pending_confirm` and the returned `action_id`.
+
 ## Common Actions
 
 ```text
@@ -142,11 +146,20 @@ cleanup_sessions
 app_open
 app_focus
 app_status
+app_capabilities
 app_close
 browser_open
 browser_search
+browser_tabs
+browser_current
+browser_control
+browser_capabilities
 music_control
 music_search
+music_status
+music_set_volume
+music_search_app
+music_capabilities
 search_obsidian
 append_note
 append_daily_note
@@ -165,6 +178,11 @@ pending_create
 pending_list
 pending_confirm
 pending_cancel
+audit_list
+workflow_plan
+workflow_execute
+workflow_get
+workflow_cancel
 ```
 
 Generic intent request:
@@ -186,12 +204,12 @@ Generic intent request:
 Built-in categories:
 
 ```text
-music    open, play, pause, toggle, next, previous, search
+music    open, play, pause, toggle, next, previous, search, search_app, status, volume, capabilities
 docs     remember, search, create, open, append, daily
 ai       open, send, continue, status, focus, stop, slash, model
 dev      open, build, test, clean, errors
-browser  open, search
-app      open, focus, status, close
+browser  open, search, tabs, current, control, capabilities
+app      open, focus, status, close, capabilities
 system   open, reveal, clipboard_get, clipboard_set
 ```
 
@@ -199,7 +217,38 @@ Use `GET /api/v1/actions` for machine-readable parameters and risk levels.
 
 Use `GET /api/v2/actions` for parameter schemas, policy metadata, examples, and v1 compatibility markers.
 
-Medium-risk actions such as `ask_cc`, `ask_cc_project`, `continue_cc`, `stop_cc`, `app_close`, `cc_send_slash_command`, `cc_switch_model`, `xcode_build`, `xcode_test`, and `xcode_clean` create a pending action by default. Pass `"confirm": true` only when the client has already received explicit user confirmation.
+Medium-risk actions such as `ask_cc`, `app_close`, `browser_control`, `music_search_app`, and Xcode actions create a persistent pending action. API v1 retains the legacy `confirm=true` behavior for compatibility; API v2 always requires the separate `pending_confirm` action.
+
+## Workflows
+
+Create a validated plan without executing it:
+
+```json
+{
+  "action": "workflow_plan",
+  "params": {
+    "name": "research and save",
+    "steps": [
+      {"action": "browser_open", "params": {"url": "https://example.com"}},
+      {"action": "remember", "params": {"text": "Research started"}}
+    ]
+  }
+}
+```
+
+Call `workflow_execute` with the returned `workflow_id`. A workflow pauses with `status=waiting_confirmation` when a step creates a pending action. Confirm that action, then call `workflow_execute` again to resume. Workflow and pending state survive service restarts.
+
+## Browser Drivers
+
+- Chrome, Edge, and Arc use the Chromium AppleScript Driver.
+- Safari uses a dedicated Safari Driver.
+- Read actions: `browser_tabs`, `browser_current`, `browser_capabilities`.
+- Confirmed control: `browser_control` with `focus_tab`, `close_tab`, `reload`, `back`, or `forward`.
+- Arbitrary JavaScript and coordinate clicking are not exposed.
+
+## MCP v2
+
+Standard MCP clients can call `desktop_dispatch_v2(action, params, client)` to use the same Schema, policy, pending, workflow, and audit pipeline as HTTP API v2.
 
 Claude Code/Codex send, continue, and stop actions require a registered session by default. A client may pass `"allow_frontmost": true` only when the user explicitly wants to target the frontmost Terminal tab.
 

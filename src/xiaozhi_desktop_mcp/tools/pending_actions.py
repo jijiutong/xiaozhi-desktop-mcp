@@ -8,6 +8,7 @@ from uuid import uuid4
 from ..action_registry import pending_action_types, pending_spec
 from ..config import Settings
 from ..responses import fail, ok
+from ..storage import PendingActionStore
 from .apps import close_app
 from .cc_session import (
     close_terminal,
@@ -36,7 +37,13 @@ class PendingAction:
 _pending_actions: dict[str, PendingAction] = {}
 
 
-def create_pending_action(action_type: str, params: dict | None = None, title: str = "") -> dict:
+def create_pending_action(
+    action_type: str,
+    params: dict | None = None,
+    title: str = "",
+    *,
+    settings: Settings | None = None,
+) -> dict:
     """Create a pending action that can be confirmed later."""
     normalized = action_type.strip()
     if normalized not in ALLOWED_ACTION_TYPES:
@@ -57,6 +64,13 @@ def create_pending_action(action_type: str, params: dict | None = None, title: s
         params=clean_params,
         title=clean_title,
     )
+    if settings is not None:
+        record = PendingActionStore(settings).create(action_id, normalized, clean_params, clean_title)
+        return ok(
+            {"action": record},
+            f"已创建待确认动作：{clean_title}。",
+            "created pending action",
+        )
     _pending_actions[action_id] = action
     return ok(
         {"action": _serialize(action)},
@@ -65,14 +79,17 @@ def create_pending_action(action_type: str, params: dict | None = None, title: s
     )
 
 
-def list_pending_actions(status: str = "pending") -> dict:
+def list_pending_actions(status: str = "pending", *, settings: Settings | None = None) -> dict:
     """List pending actions by status. Empty status means all actions."""
     normalized = status.strip().lower()
-    actions = []
-    for action in sorted(_pending_actions.values(), key=lambda item: item.created_at):
-        if normalized and action.status != normalized:
-            continue
-        actions.append(_serialize(action))
+    if settings is not None:
+        actions = PendingActionStore(settings).list(normalized)
+    else:
+        actions = []
+        for action in sorted(_pending_actions.values(), key=lambda item: item.created_at):
+            if normalized and action.status != normalized:
+                continue
+            actions.append(_serialize(action))
     if normalized == "pending":
         spoken = f"当前有 {len(actions)} 个待确认动作。"
     else:
@@ -87,8 +104,19 @@ def list_pending_actions(status: str = "pending") -> dict:
     )
 
 
-def cancel_pending_action(action_id: str) -> dict:
+def cancel_pending_action(action_id: str, *, settings: Settings | None = None) -> dict:
     """Cancel a pending action without executing it."""
+    if settings is not None:
+        record, error = PendingActionStore(settings).cancel(action_id.strip())
+        if not record:
+            return fail("pending action not found", "我没有找到这个待确认动作。")
+        if error:
+            return fail(f"pending action is already {error}", "这个动作已经处理过了。")
+        return ok(
+            {"action": record},
+            f"已取消：{record['title']}。",
+            "cancelled pending action",
+        )
     action = _pending_actions.get(action_id.strip())
     if not action:
         return fail("pending action not found", "我没有找到这个待确认动作。")
@@ -105,7 +133,19 @@ def cancel_pending_action(action_id: str) -> dict:
 
 def confirm_pending_action(settings: Settings, action_id: str) -> dict:
     """Confirm and execute a pending action."""
-    action = _pending_actions.get(action_id.strip())
+    clean_id = action_id.strip()
+    store = PendingActionStore(settings)
+    record, claim_error = store.claim(clean_id)
+    if record:
+        if claim_error:
+            return fail(f"pending action is already {claim_error}", "这个动作已经处理过了。")
+        action = _from_record(record)
+        result = _execute(settings, action)
+        status = "completed" if result.get("success") else "failed"
+        resolved = store.resolve(clean_id, status, result) or record
+        return _confirmation_response(resolved, result)
+
+    action = _pending_actions.get(clean_id)
     if not action:
         return fail("pending action not found", "我没有找到这个待确认动作。")
     if action.status != "pending":
@@ -114,12 +154,15 @@ def confirm_pending_action(settings: Settings, action_id: str) -> dict:
     action.result = result
     action.resolved_at = datetime.now()
     action.status = "completed" if result.get("success") else "failed"
+    response = _confirmation_response(_serialize(action), result)
+    return response
+
+
+def _confirmation_response(action: dict, result: dict) -> dict:
+    title = action.get("title", "待确认动作")
     response = ok(
-        {
-            "action": _serialize(action),
-            "execution_result": result,
-        },
-        f"已确认并执行：{action.title}。" if result.get("success") else f"确认后执行失败：{action.title}。",
+        {"action": action, "execution_result": result},
+        f"已确认并执行：{title}。" if result.get("success") else f"确认后执行失败：{title}。",
         "confirmed pending action",
     )
     if not result.get("success"):
@@ -129,10 +172,39 @@ def confirm_pending_action(settings: Settings, action_id: str) -> dict:
     return response
 
 
+def _from_record(record: dict) -> PendingAction:
+    return PendingAction(
+        action_id=str(record["action_id"]),
+        action_type=str(record["action_type"]),
+        params=dict(record.get("params", {})),
+        title=str(record.get("title", "")),
+        status=str(record.get("status", "executing")),
+        created_at=datetime.fromisoformat(str(record["created_at"])),
+    )
+
+
 def _execute(settings: Settings, action: PendingAction) -> dict:
     params = action.params
     if action.action_type == "app_close":
         return close_app(settings, str(params.get("app_name", "")))
+    if action.action_type == "browser_control":
+        from .browser import browser_control
+
+        return browser_control(
+            settings,
+            str(params.get("command", "")),
+            str(params.get("app_name", "")),
+            int(params.get("window_index", 1)),
+            int(params.get("tab_index", 1)),
+        )
+    if action.action_type == "music_search_app":
+        from .music import music_search_app
+
+        return music_search_app(
+            settings,
+            str(params.get("query", "")),
+            str(params.get("app_name", "")),
+        )
     if action.action_type == "cc_close_terminal":
         return close_terminal(str(params.get("terminal", "Terminal")))
     if action.action_type == "cc_continue":

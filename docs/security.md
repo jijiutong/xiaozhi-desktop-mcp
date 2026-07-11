@@ -12,6 +12,8 @@ These actions are enabled in the first version:
 - Open applications listed in `ALLOWED_APPS`.
 - Open Xcode projects inside `XCODE_ALLOWED_PROJECTS`.
 - Browser opens only http(s) URLs and only through allowlisted browser apps.
+- Browser URLs containing embedded credentials are rejected.
+- `DESKTOP_MCP_BROWSER_ALLOWED_DOMAINS` can restrict navigation to exact domains and their subdomains.
 - Finder opens paths only inside known safe roots.
 - Clipboard set/get is explicit under the `system` category.
 
@@ -26,6 +28,8 @@ These actions should create a pending action first or require explicit confirmat
 - Close terminal windows or applications.
 - Switch models or send slash commands.
 - Run Xcode build, test, or clean.
+- Focus, close, reload, or navigate a browser tab through `browser_control`.
+- Type a query into NetEase Cloud Music through `music_search_app`.
 
 ## High Risk: Deny by Default
 
@@ -62,6 +66,24 @@ These actions should stay disabled unless a user explicitly opts in with strong 
   duration, client host, and auth result without printing the token.
 - stdio MCP tool calls log tool name, success flag, and duration without logging
   full tool arguments.
+
+## API v2 Rules
+
+- Parameters are validated against the action JSON Schema before a tool can run.
+- Unknown parameters and invalid enum values are rejected.
+- `confirm=true` never bypasses a medium-risk action in API v2.
+- Medium-risk actions must be confirmed with a separate `pending_confirm` request.
+- Pending actions have a configurable TTL and can only be claimed once.
+- Workflows cannot contain nested workflow-control actions.
+
+## Persistent State and Audit
+
+- Pending actions, workflows, and audit events are stored in `DESKTOP_MCP_STATE_DB`.
+- SQLite transactions prevent duplicate confirmation from executing an action twice.
+- Expired actions cannot be confirmed.
+- Audit events store request id, client, action, result, duration, and parameter names only.
+- Audit events never store parameter values, bearer tokens, note text, search text, or workflow payloads.
+- Audit write failures are logged but do not block unrelated low-risk operations.
 
 ## Terminal Targeting
 

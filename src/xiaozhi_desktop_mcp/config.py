@@ -31,6 +31,13 @@ class Settings:
     allowed_apps: frozenset[str]
     app_aliases: dict[str, str]
     app_process_aliases: dict[str, tuple[str, ...]]
+    app_automation_aliases: dict[str, str]
+    state_db_path: Path
+    pending_ttl_seconds: int
+    audit_enabled: bool
+    audit_retention_days: int
+    browser_control_enabled: bool
+    browser_allowed_domains: frozenset[str]
     cc_allowed_projects: frozenset[Path]
     cc_allowed_clis: frozenset[str]
     cc_default_cli: str
@@ -189,6 +196,19 @@ def load_settings() -> Settings:
         **_yaml_list_mapping(desktop_config, "app_process_aliases"),
         **_split_list_mapping(os.getenv("APP_PROCESS_ALIASES", "")),
     }
+    app_automation_aliases = {
+        "网易云音乐": "NeteaseMusic",
+        **_yaml_str_mapping(desktop_config, "app_automation_aliases"),
+        **_split_mapping(os.getenv("APP_AUTOMATION_ALIASES", "")),
+    }
+    state_db_path = Path(
+        os.getenv("DESKTOP_MCP_STATE_DB", "~/.local/share/xiaozhi-desktop-mcp/state.db")
+    ).expanduser().resolve()
+    pending_ttl_seconds = max(60, _int_env("DESKTOP_MCP_PENDING_TTL_SECONDS", 600))
+    audit_enabled = _bool_env("DESKTOP_MCP_AUDIT_ENABLED", True)
+    audit_retention_days = max(1, _int_env("DESKTOP_MCP_AUDIT_RETENTION_DAYS", 30))
+    browser_control_enabled = _bool_env("DESKTOP_MCP_BROWSER_CONTROL_ENABLED", True)
+    browser_allowed_domains = _split_csv(os.getenv("DESKTOP_MCP_BROWSER_ALLOWED_DOMAINS", ""))
 
     # cc/Claude Code/Codex 会话配置：默认能玩，后续可以通过 .env 收紧。
     if default_project_root:
@@ -219,6 +239,13 @@ def load_settings() -> Settings:
         allowed_apps=allowed_apps,
         app_aliases=app_aliases,
         app_process_aliases=app_process_aliases,
+        app_automation_aliases=app_automation_aliases,
+        state_db_path=state_db_path,
+        pending_ttl_seconds=pending_ttl_seconds,
+        audit_enabled=audit_enabled,
+        audit_retention_days=audit_retention_days,
+        browser_control_enabled=browser_control_enabled,
+        browser_allowed_domains=browser_allowed_domains,
         cc_allowed_projects=cc_allowed_projects,
         cc_allowed_clis=cc_allowed_clis,
         cc_default_cli=cc_default_cli,

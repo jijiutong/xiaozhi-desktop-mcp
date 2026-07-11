@@ -6,9 +6,9 @@
 
 它不是新的小智后端，也不是任意 shell 执行器。这个项目的核心是：用 MCP / HTTP 接口暴露能力，同时用白名单、路径限制、待确认动作、鉴权和可观测日志把桌面自动化收进安全边界。
 
-[API](docs/api.md) · [Client Examples](docs/clients.md) · [Operations](docs/operations.md) · [Security](docs/security.md) · [Xiaozhi Integration](docs/xiaozhi-integration.md)
+[API](docs/api.md) · [3.0 Migration](docs/migration-v3.md) · [Client Examples](docs/clients.md) · [Operations](docs/operations.md) · [Security](docs/security.md) · [Xiaozhi Integration](docs/xiaozhi-integration.md)
 
-License: MIT · Version: 3.0.0-alpha.1 · Python · FastMCP · FastAPI
+License: MIT · Version: 3.0.0 · Python · FastMCP · FastAPI
 
 ---
 
@@ -56,7 +56,7 @@ flowchart LR
 | MCP stdio | `xiaozhi-desktop-mcp` | 标准输入输出 | Claude Desktop、小智 bridge、本机 MCP client |
 | MCP Streamable HTTP | `xiaozhi-desktop-mcp-streamable` | `http://127.0.0.1:8766/mcp` | 支持 MCP over HTTP 的客户端 |
 | HTTP API v1 | `xiaozhi-desktop-http` | `http://127.0.0.1:8765/api/v1` | Java / Python / Go / 稳定客户端 |
-| HTTP API v2 alpha | `xiaozhi-desktop-http` | `http://127.0.0.1:8765/api/v2` | schema / policy / trace 能力发现 |
+| HTTP API v2 | `xiaozhi-desktop-http` | `http://127.0.0.1:8765/api/v2` | schema 校验、策略、审计、工作流 |
 
 如果你接的是标准 MCP Client，优先使用 `stdio` 或 `Streamable HTTP`。
 
@@ -75,9 +75,11 @@ flowchart LR
 | Project Alias | 从 `CC_ALLOWED_PROJECTS` 生成安全项目别名 |
 | Apps | 打开、关闭、聚焦或查询 `ALLOWED_APPS` 白名单内的 macOS App |
 | Xcode | 打开项目、build、test、clean、查看最近错误 |
-| Browser / Finder / Clipboard | 浏览器打开搜索、Finder 定位、剪贴板读写 |
-| Music | 播放、暂停、下一首、网易云音乐搜索等语音友好控制 |
-| Pending Actions | 中风险动作先入队，确认后执行 |
+| Browser / Finder / Clipboard | 标签页读取与控制、打开搜索、Finder 定位、剪贴板读写 |
+| Music | Apple Music 状态/音量控制、网易云播放和客户端内搜索 |
+| Pending Actions | SQLite 持久化、TTL、原子确认、防重复执行 |
+| Workflows | 多步骤计划、暂停确认、重启恢复、继续和取消 |
+| Audit | SQLite 脱敏审计，只保存参数名，不保存参数值 |
 | Diagnostics | 健康检查、配置摘要、工具目录、会话清理 |
 | Observability | `X-Request-Id`、请求日志、工具调用耗时、错误追踪 |
 
@@ -109,6 +111,14 @@ XCODE_ALLOWED_PROJECTS=/path/to/your/project
 ALLOWED_APPS=Obsidian,Xcode,Google Chrome,Safari,Music,Finder,Terminal
 APP_ALIASES=chrome=Google Chrome,netease=网易云音乐,网易云=网易云音乐
 APP_PROCESS_ALIASES=网易云音乐=网易云音乐|NetEaseMusic|NeteaseMusic
+APP_AUTOMATION_ALIASES=网易云音乐=NeteaseMusic
+
+DESKTOP_MCP_STATE_DB=~/.local/share/xiaozhi-desktop-mcp/state.db
+DESKTOP_MCP_PENDING_TTL_SECONDS=600
+DESKTOP_MCP_AUDIT_ENABLED=true
+DESKTOP_MCP_BROWSER_CONTROL_ENABLED=true
+# 留空允许任意 http(s) 域名；生产环境可配置 example.com,docs.example.com
+DESKTOP_MCP_BROWSER_ALLOWED_DOMAINS=
 ```
 
 启动普通 HTTP API：
@@ -205,7 +215,13 @@ POST /api/v1/dispatch
 | 打开 / 关闭 App | `app_open` / `app_close` |
 | 聚焦 / 查询 App | `app_focus` / `app_status` |
 | 浏览器打开 / 搜索 | `browser_open` / `browser_search` |
-| 音乐控制 / 搜索 | `music_control` / `music_search` |
+| 浏览器标签页 / 当前页 | `browser_tabs` / `browser_current` |
+| 浏览器控制 / 能力 | `browser_control` / `browser_capabilities` |
+| 音乐控制 / 状态 / 音量 | `music_control` / `music_status` / `music_set_volume` |
+| 网易云客户端搜索 | `music_search_app` |
+| App Driver 能力 | `app_capabilities` |
+| 工作流计划 / 执行 / 查询 / 取消 | `workflow_plan` / `workflow_execute` / `workflow_get` / `workflow_cancel` |
+| 审计记录 | `audit_list` |
 | Xcode 构建 / 测试 / 清理 | `xcode_build` / `xcode_test` / `xcode_clean` |
 | 查看 Xcode 最近错误 | `xcode_last_errors` |
 | 创建 / 确认待执行动作 | `pending_create` / `pending_confirm` |
@@ -226,6 +242,10 @@ POST /api/v1/dispatch
 小智，打开 Xcode 项目并构建。
 小智，音乐下一首。
 小智，用浏览器搜索 desktop mcp。
+小智，列出 Chrome 的标签页。
+小智，切到 Chrome 第二个标签页。
+小智，看看 Apple Music 正在播放什么。
+小智，在网易云音乐客户端搜索周杰伦。
 小智，把这段话复制到剪贴板。
 ```
 
@@ -263,6 +283,9 @@ X-Desktop-Mcp-Token: <token>
 | `src/xiaozhi_desktop_mcp/server.py` | 标准 MCP stdio / Streamable HTTP 工具入口 |
 | `src/xiaozhi_desktop_mcp/http_server.py` | FastAPI HTTP 服务 |
 | `src/xiaozhi_desktop_mcp/api_v1.py` | 多语言统一 dispatch API |
+| `src/xiaozhi_desktop_mcp/api_v2.py` | Schema、策略、错误码和审计执行入口 |
+| `src/xiaozhi_desktop_mcp/storage.py` | pending、workflow、audit SQLite 状态库 |
+| `src/xiaozhi_desktop_mcp/workflows_v2.py` | 可恢复多步骤工作流 |
 | `src/xiaozhi_desktop_mcp/tools/` | Obsidian、App、cc、项目、Xcode、pending actions 等工具 |
 | `desktop-mcp.yaml` | 通用桌面 category registry 配置 |
 | `docs/api.md` | HTTP API 协议 |

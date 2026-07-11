@@ -8,13 +8,28 @@ from typing import Any
 from .action_registry import api_action_specs
 from .config import Settings
 from .responses import fail, ok
-from .tools.apps import app_status, close_app, focus_app, open_app
-from .tools.browser import browser_open_url, browser_search
+from .storage import list_audit_events
+from .tools.apps import app_capabilities, app_status, close_app, focus_app, open_app
+from .tools.browser import (
+    browser_capabilities,
+    browser_control,
+    browser_current,
+    browser_open_url,
+    browser_search,
+    browser_tabs,
+)
 from .tools.catalog import tool_catalog
 from .tools.cc_session import cleanup_sessions, send_slash_command, switch_model
 from .tools.diagnostics import config_summary, health_detail
 from .tools.intent import desktop_intent, desktop_intent_catalog
-from .tools.music import music_control, music_search
+from .tools.music import (
+    music_capabilities,
+    music_control,
+    music_search,
+    music_search_app,
+    music_set_volume,
+    music_status,
+)
 from .tools.obsidian import append_daily_note, append_note, create_note, open_note, recent_memories, search_notes
 from .tools.pending_actions import (
     cancel_pending_action,
@@ -33,6 +48,7 @@ from .tools.workflows import (
     stop_cc,
 )
 from .tools.xcode import open_xcode_project, xcode_build, xcode_clean, xcode_last_errors, xcode_test
+from .workflows_v2 import cancel_workflow, execute_workflow, get_workflow, plan_workflow
 
 ActionHandler = Callable[[Settings, dict[str, Any]], dict]
 logger = logging.getLogger(__name__)
@@ -142,6 +158,7 @@ def _remember(settings: Settings, params: dict[str, Any]) -> dict:
 def _app_close(settings: Settings, params: dict[str, Any]) -> dict:
     pending_params = {"app_name": _str(params, "app_name")}
     return _confirm_or_pending(
+        settings,
         params,
         "app_close",
         pending_params,
@@ -173,6 +190,7 @@ def _open_cc_project_named(settings: Settings, params: dict[str, Any]) -> dict:
 
 
 def _confirm_or_pending(
+    settings: Settings,
     params: dict[str, Any],
     action_type: str,
     pending_params: dict[str, Any],
@@ -180,7 +198,7 @@ def _confirm_or_pending(
     title: str = "",
 ) -> dict:
     if not _bool(params, "confirm"):
-        return create_pending_action(action_type, pending_params, title)
+        return create_pending_action(action_type, pending_params, title, settings=settings)
     return runner()
 
 
@@ -195,6 +213,7 @@ def _ask_cc(settings: Settings, params: dict[str, Any]) -> dict:
         "allow_frontmost": _bool(params, "allow_frontmost", False),
     }
     return _confirm_or_pending(
+        settings,
         params,
         "desktop_ask_cc",
         pending_params,
@@ -223,6 +242,7 @@ def _ask_cc_project(settings: Settings, params: dict[str, Any]) -> dict:
         "allow_frontmost": _bool(params, "allow_frontmost", False),
     }
     return _confirm_or_pending(
+        settings,
         params,
         "desktop_ask_cc_project",
         pending_params,
@@ -245,6 +265,7 @@ def _continue_cc(settings: Settings, params: dict[str, Any]) -> dict:
     allow_frontmost = _bool(params, "allow_frontmost", False)
     pending_params = {"session_id": session_id, "allow_frontmost": allow_frontmost}
     return _confirm_or_pending(
+        settings,
         params,
         "cc_continue",
         pending_params,
@@ -261,6 +282,7 @@ def _cc_send_slash_command(settings: Settings, params: dict[str, Any]) -> dict:
         "allow_frontmost": _bool(params, "allow_frontmost", False),
     }
     return _confirm_or_pending(
+        settings,
         params,
         "cc_send_slash_command",
         pending_params,
@@ -283,6 +305,7 @@ def _cc_switch_model(settings: Settings, params: dict[str, Any]) -> dict:
         "allow_frontmost": _bool(params, "allow_frontmost", False),
     }
     return _confirm_or_pending(
+        settings,
         params,
         "cc_switch_model",
         pending_params,
@@ -302,6 +325,7 @@ def _stop_cc(settings: Settings, params: dict[str, Any]) -> dict:
     allow_frontmost = _bool(params, "allow_frontmost", False)
     pending_params = {"session_id": session_id, "allow_frontmost": allow_frontmost}
     return _confirm_or_pending(
+        settings,
         params,
         "cc_stop",
         pending_params,
@@ -310,7 +334,7 @@ def _stop_cc(settings: Settings, params: dict[str, Any]) -> dict:
     )
 
 
-def _xcode_action(action_type: str, params: dict[str, Any], runner) -> dict:
+def _xcode_action(settings: Settings, action_type: str, params: dict[str, Any], runner) -> dict:
     pending_params = {
         "project_path": _str(params, "project_path"),
         "xcode_path": _str(params, "xcode_path"),
@@ -318,7 +342,7 @@ def _xcode_action(action_type: str, params: dict[str, Any], runner) -> dict:
         "configuration": _str(params, "configuration"),
         "destination": _str(params, "destination"),
     }
-    return _confirm_or_pending(params, action_type, pending_params, lambda: runner(**pending_params))
+    return _confirm_or_pending(settings, params, action_type, pending_params, lambda: runner(**pending_params))
 
 
 def _pending_create(settings: Settings, params: dict[str, Any]) -> dict:
@@ -327,7 +351,48 @@ def _pending_create(settings: Settings, params: dict[str, Any]) -> dict:
         _str(params, "action_type"),
         pending_params if isinstance(pending_params, dict) else {},
         _str(params, "title"),
+        settings=settings,
     )
+
+
+def _browser_control(settings: Settings, params: dict[str, Any]) -> dict:
+    pending_params = {
+        "command": _str(params, "command"),
+        "app_name": _str(params, "app_name"),
+        "window_index": _int(params, "window_index", 1),
+        "tab_index": _int(params, "tab_index", 1),
+    }
+    return _confirm_or_pending(
+        settings,
+        params,
+        "browser_control",
+        pending_params,
+        lambda: browser_control(settings, **pending_params),
+        f"浏览器操作：{pending_params['command']}",
+    )
+
+
+def _music_search_app(settings: Settings, params: dict[str, Any]) -> dict:
+    pending_params = {"query": _str(params, "query"), "app_name": _str(params, "app_name")}
+    return _confirm_or_pending(
+        settings,
+        params,
+        "music_search_app",
+        pending_params,
+        lambda: music_search_app(settings, **pending_params),
+        f"在网易云音乐中搜索：{pending_params['query']}",
+    )
+
+
+def _workflow_plan(settings: Settings, params: dict[str, Any]) -> dict:
+    steps = params.get("steps", [])
+    return plan_workflow(settings, _str(params, "name"), steps if isinstance(steps, list) else [])
+
+
+def _workflow_execute(settings: Settings, params: dict[str, Any]) -> dict:
+    from .api_v2 import dispatch as api_v2_dispatch
+
+    return execute_workflow(settings, _str(params, "workflow_id"), api_v2_dispatch)
 
 
 _ACTION_HANDLERS: dict[str, ActionHandler] = {
@@ -335,6 +400,7 @@ _ACTION_HANDLERS: dict[str, ActionHandler] = {
     "app_open": lambda settings, params: open_app(settings, _str(params, "app_name")),
     "app_focus": lambda settings, params: focus_app(settings, _str(params, "app_name")),
     "app_status": lambda settings, params: app_status(settings, _str(params, "app_name")),
+    "app_capabilities": lambda settings, params: app_capabilities(settings, _str(params, "app_name")),
     "app_close": _app_close,
     "open_cc_project": _open_cc_project,
     "open_cc_project_named": _open_cc_project_named,
@@ -394,16 +460,19 @@ _ACTION_HANDLERS: dict[str, ActionHandler] = {
         _str(params, "xcode_path"),
     ),
     "xcode_build": lambda settings, params: _xcode_action(
+        settings,
         "xcode_build",
         params,
         lambda **kwargs: xcode_build(settings, **kwargs),
     ),
     "xcode_test": lambda settings, params: _xcode_action(
+        settings,
         "xcode_test",
         params,
         lambda **kwargs: xcode_test(settings, **kwargs),
     ),
     "xcode_clean": lambda settings, params: _xcode_action(
+        settings,
         "xcode_clean",
         params,
         lambda **kwargs: xcode_clean(settings, **kwargs),
@@ -420,6 +489,10 @@ _ACTION_HANDLERS: dict[str, ActionHandler] = {
         _str(params, "app_name") or _str(params, "app"),
         _str(params, "engine", "google"),
     ),
+    "browser_tabs": lambda settings, params: browser_tabs(settings, _str(params, "app_name")),
+    "browser_current": lambda settings, params: browser_current(settings, _str(params, "app_name")),
+    "browser_control": _browser_control,
+    "browser_capabilities": lambda settings, params: browser_capabilities(settings, _str(params, "app_name")),
     "music_control": lambda settings, params: music_control(
         settings,
         _str(params, "command", "toggle"),
@@ -431,8 +504,21 @@ _ACTION_HANDLERS: dict[str, ActionHandler] = {
         _str(params, "browser"),
         _str(params, "provider"),
     ),
+    "music_status": lambda settings, params: music_status(settings, _str(params, "app_name")),
+    "music_set_volume": lambda settings, params: music_set_volume(
+        settings, _int(params, "volume", 50), _str(params, "app_name")
+    ),
+    "music_search_app": _music_search_app,
+    "music_capabilities": lambda settings, params: music_capabilities(settings, _str(params, "app_name")),
     "pending_create": _pending_create,
-    "pending_list": lambda settings, params: list_pending_actions(_str(params, "status", "pending")),
+    "pending_list": lambda settings, params: list_pending_actions(
+        _str(params, "status", "pending"), settings=settings
+    ),
     "pending_confirm": lambda settings, params: confirm_pending_action(settings, _str(params, "action_id")),
-    "pending_cancel": lambda settings, params: cancel_pending_action(_str(params, "action_id")),
+    "pending_cancel": lambda settings, params: cancel_pending_action(_str(params, "action_id"), settings=settings),
+    "audit_list": lambda settings, params: list_audit_events(settings, _int(params, "limit", 50)),
+    "workflow_plan": _workflow_plan,
+    "workflow_execute": _workflow_execute,
+    "workflow_get": lambda settings, params: get_workflow(settings, _str(params, "workflow_id")),
+    "workflow_cancel": lambda settings, params: cancel_workflow(settings, _str(params, "workflow_id")),
 }

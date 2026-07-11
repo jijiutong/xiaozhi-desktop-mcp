@@ -1,38 +1,20 @@
 from __future__ import annotations
 
-import subprocess
 from urllib.parse import quote_plus
 
 from ..config import Settings
 from ..responses import fail, ok
 from ..safety import SafetyError
-from .apps import applescript_quote, resolve_app_name
-
-_COMMANDS = {
-    "play": "play",
-    "pause": "pause",
-    "toggle": "playpause",
-    "play_pause": "playpause",
-    "next": "next track",
-    "previous": "previous track",
-}
+from .apps import automation_app_name, resolve_app_name
+from .music_drivers import music_driver
 
 
 def music_control(settings: Settings, command: str = "toggle", app_name: str = "") -> dict:
     """Control an allowlisted macOS music app with AppleScript."""
-    normalized = command.strip().lower().replace("-", "_") or "toggle"
-    if normalized not in _COMMANDS:
-        return fail(f"unsupported music command: {command}", "这个音乐控制命令还不支持。")
-    app = app_name.strip() or _default_music_app(settings)
-    try:
-        allowed_app = resolve_app_name(settings, app)
-    except SafetyError as exc:
-        return fail(str(exc), f"{app or '音乐 App'} 不在白名单里，我没有操作。")
-    script = f"tell application {applescript_quote(allowed_app)} to {_COMMANDS[normalized]}"
-    completed = subprocess.run(["osascript", "-e", script], check=False, capture_output=True, text=True)
-    if completed.returncode != 0:
-        return fail(completed.stderr.strip() or completed.stdout.strip(), "音乐控制没有成功。", {"app": allowed_app})
-    return ok({"app": allowed_app, "command": normalized}, "音乐操作完成。", "music command completed")
+    driver = _resolve_music_driver(settings, app_name)
+    if isinstance(driver, dict):
+        return driver
+    return driver.control(command)
 
 
 def music_search(settings: Settings, query: str, app_name: str = "", provider: str = "") -> dict:
@@ -51,6 +33,50 @@ def music_search(settings: Settings, query: str, app_name: str = "", provider: s
         url = "https://music.apple.com/search?term=" + quote_plus(clean)
     browser_app = "" if app_name.strip() in {"网易云音乐", "NetEase Cloud Music", "Music", "Spotify"} else app_name
     return browser_open_url(settings, url, browser_app or _default_browser_for_music(settings))
+
+
+def music_status(settings: Settings, app_name: str = "") -> dict:
+    driver = _resolve_music_driver(settings, app_name)
+    if isinstance(driver, dict):
+        return driver
+    return driver.status()
+
+
+def music_set_volume(settings: Settings, volume: int, app_name: str = "") -> dict:
+    driver = _resolve_music_driver(settings, app_name)
+    if isinstance(driver, dict):
+        return driver
+    return driver.set_volume(volume)
+
+
+def music_search_app(settings: Settings, query: str, app_name: str = "") -> dict:
+    driver = _resolve_music_driver(settings, app_name or "网易云音乐")
+    if isinstance(driver, dict):
+        return driver
+    return driver.search_app(query)
+
+
+def music_capabilities(settings: Settings, app_name: str = "") -> dict:
+    driver = _resolve_music_driver(settings, app_name)
+    if isinstance(driver, dict):
+        return driver
+    return ok(
+        {"app": driver.app_name, "driver": driver.family, "capabilities": driver.capabilities()},
+        "已返回音乐 App 能力。",
+        "returned music capabilities",
+    )
+
+
+def _resolve_music_driver(settings: Settings, app_name: str):
+    app = app_name.strip() or _default_music_app(settings)
+    try:
+        allowed_app = resolve_app_name(settings, app)
+    except SafetyError as exc:
+        return fail(str(exc), f"{app or '音乐 App'} 不在白名单里，我没有操作。")
+    driver = music_driver(allowed_app, automation_app_name(settings, allowed_app))
+    if driver is None:
+        return fail(f"music driver is unavailable for: {allowed_app}", "这个音乐 App 暂时没有控制 Driver。")
+    return driver
 
 
 def _default_music_app(settings: Settings) -> str:

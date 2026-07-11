@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+## 3.0.0 - 2026-07-10
+
+### Added
+
+- Added strict API v2 parameter validation, enum validation, stable error codes, policy metadata, and redacted SQLite audit events.
+- Added persistent pending actions with TTL expiration, atomic single-use confirmation, restart recovery, and replay protection.
+- Added resumable workflow planning and execution with validation, cancellation, confirmation pauses, and restart-safe state.
+- Added Chromium and Safari Drivers for tab discovery, current-page inspection, focus, close, reload, back, and forward actions.
+- Added Apple Music and NetEase Cloud Music Drivers, playback status, volume, capability discovery, and confirmed in-app NetEase search.
+- Added `app_capabilities`, browser Driver actions, music Driver actions, workflow actions, `audit_list`, and the `desktop_dispatch_v2` MCP entry.
+- Added optional browser domain allowlists and URL credential rejection.
+- Added separate App automation-name aliases for installations such as `NeteaseMusic.app` displayed as 网易云音乐.
+
+### Changed
+
+- API v2 no longer trusts `confirm=true` for medium-risk actions; a separate pending confirmation is always required.
+- App aliases are resolved case-insensitively across app, browser, and music actions.
+- Pending actions and workflows now use `DESKTOP_MCP_STATE_DB` instead of process memory.
+- API v1 remains wire compatible for existing clients.
+
 ## 3.0.0-alpha.1 - 2026-07-09
 
 ### Added

@@ -9,6 +9,13 @@ def tool_catalog() -> dict:
     risk_by_action = {spec.name: spec.risk for spec in api_action_specs()}
     tools = [
         {
+            "name": "desktop_dispatch_v2",
+            "risk": "variable",
+            "use_when": "新 MCP 客户端需要统一 Schema 校验、风险策略、审计和工作流入口。",
+            "api_v1_action": "",
+            "api_v2_entry": True,
+        },
+        {
             "name": "desktop_remember",
             "risk": "low",
             "use_when": "用户说记一下、保存想法、写到 Obsidian。",
@@ -37,6 +44,30 @@ def tool_catalog() -> dict:
             "risk": "medium",
             "use_when": "用户要关闭白名单 App。",
             "api_v1_action": "app_close",
+        },
+        {
+            "name": "browser_control",
+            "risk": "medium",
+            "use_when": "用户要切换、关闭、刷新或前进后退浏览器标签页。",
+            "api_v1_action": "browser_control",
+        },
+        {
+            "name": "music_search_app",
+            "risk": "medium",
+            "use_when": "用户明确要在网易云音乐客户端内输入并搜索歌曲。",
+            "api_v1_action": "music_search_app",
+        },
+        {
+            "name": "workflow_plan",
+            "risk": "low",
+            "use_when": "客户端要预览并持久化多步骤桌面工作流，不立即执行。",
+            "api_v1_action": "workflow_plan",
+        },
+        {
+            "name": "workflow_execute",
+            "risk": "variable",
+            "use_when": "用户要执行或继续一个已规划工作流。",
+            "api_v1_action": "workflow_execute",
         },
         {
             "name": "desktop_ask_cc",
@@ -189,7 +220,7 @@ def tool_catalog() -> dict:
             tool["risk"] = risk_by_action[api_action]
     return ok(
         {
-            "recommended_default": "HTTP 客户端统一使用 POST /api/v1/dispatch，并传入 api_v1_action。",
+            "recommended_default": "新客户端使用 POST /api/v2/dispatch；旧客户端继续使用 /api/v1/dispatch。",
             "tools": tools,
             "count": len(tools),
         },

@@ -14,11 +14,14 @@
     "Google Chrome": ["Google Chrome"],
     "Microsoft Edge": ["Microsoft Edge"]
   },
+  "app_automation_aliases": {
+    "网易云音乐": "NeteaseMusic"
+  },
   "categories": {
     "music": {
       "default_app": "Music",
       "apps": ["Music", "网易云音乐", "NetEase Cloud Music", "Spotify"],
-      "intents": ["open", "play", "pause", "toggle", "next", "previous", "search"]
+      "intents": ["open", "play", "pause", "toggle", "next", "previous", "search", "search_app", "status", "volume", "capabilities"]
     },
     "docs": {
       "default_app": "Obsidian",
@@ -38,12 +41,12 @@
     "browser": {
       "default_app": "Google Chrome",
       "apps": ["Google Chrome", "Safari", "Microsoft Edge", "Arc"],
-      "intents": ["open", "search"]
+      "intents": ["open", "search", "tabs", "current", "control", "capabilities"]
     },
     "app": {
       "default_app": "Obsidian",
       "apps": ["Obsidian", "Google Chrome", "Safari", "Music", "网易云音乐", "Finder"],
-      "intents": ["open", "focus", "status", "close"]
+      "intents": ["open", "focus", "status", "close", "capabilities"]
     },
     "system": {
       "default_app": "Finder",

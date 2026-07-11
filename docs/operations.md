@@ -80,9 +80,36 @@ The service creates directories when writing. A missing inbox directory is a war
 ## Restart Notes
 
 - Registered visible sessions are in memory.
-- Pending actions are in memory.
-- Restarting `xiaozhi-desktop-http` clears both.
+- Pending actions and workflows are persisted in `DESKTOP_MCP_STATE_DB`.
+- Restarting `xiaozhi-desktop-http` keeps pending actions, workflow progress, and audit events.
+- Pending actions older than `DESKTOP_MCP_PENDING_TTL_SECONDS` expire automatically.
 - Obsidian notes and task files are written to disk and persist.
+
+## State Database
+
+Default path:
+
+```text
+~/.local/share/xiaozhi-desktop-mcp/state.db
+```
+
+The database contains pending actions, workflow state, and redacted audit metadata. Stop the service before copying it for backup. Deleting it resets only runtime state; it does not delete Obsidian notes or project files.
+
+## Browser and Accessibility Permissions
+
+Browser tab reading uses AppleScript. NetEase Cloud Music client search uses macOS Accessibility automation. Grant Automation/Accessibility access to the terminal or service process when macOS requests it.
+
+Safe metadata checks:
+
+```bash
+DESKTOP_MCP_STATE_DB=/tmp/xiaozhi-smoke.db .venv/bin/python scripts/mac_smoke.py
+```
+
+Read-only real App checks:
+
+```bash
+.venv/bin/python scripts/mac_smoke.py --live --browser chrome --music Music
+```
 
 ## Checks Before Release
 

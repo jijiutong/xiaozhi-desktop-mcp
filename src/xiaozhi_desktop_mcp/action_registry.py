@@ -102,12 +102,23 @@ def _param_schema(params: dict[str, str]) -> dict:
             value_type = "boolean"
         elif "object" in clean_description:
             value_type = "object"
+        elif "array" in clean_description:
+            value_type = "array"
         else:
             value_type = "string"
-        properties[name] = {"type": value_type, "description": description}
+        field_schema = {"type": value_type, "description": description}
+        enum_description = clean_description.removesuffix(" optional").strip()
+        if value_type == "string" and "|" in enum_description and " " not in enum_description:
+            field_schema["enum"] = enum_description.split("|")
+        properties[name] = field_schema
         if "optional" not in clean_description:
             required.append(name)
-    return {"type": "object", "properties": properties, "required": required}
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": required,
+        "additionalProperties": False,
+    }
 
 
 def _policy_for(spec: ActionSpec) -> dict:
@@ -128,6 +139,7 @@ _API_ACTION_SPECS = (
     _action("app_open", "low", {"app_name": "string"}, "Open an allowlisted macOS app."),
     _action("app_focus", "low", {"app_name": "string"}, "Focus an allowlisted macOS app."),
     _action("app_status", "low", {"app_name": "string"}, "Check whether an allowlisted macOS app is running."),
+    _action("app_capabilities", "low", {"app_name": "string"}, "List explicit driver capabilities for an app."),
     _action(
         "app_close",
         "medium",
@@ -308,6 +320,29 @@ _API_ACTION_SPECS = (
         {"query": "string", "engine": "string optional", "app_name": "string optional"},
         "Search the web in an allowlisted browser.",
     ),
+    _action("browser_tabs", "low", {"app_name": "string optional"}, "List tabs in an allowlisted browser."),
+    _action("browser_current", "low", {"app_name": "string optional"}, "Read the current browser tab."),
+    _action(
+        "browser_control",
+        "medium",
+        {
+            "command": "focus_tab|close_tab|reload|back|forward",
+            "app_name": "string optional",
+            "window_index": "integer optional",
+            "tab_index": "integer optional",
+            "confirm": "boolean optional",
+        },
+        "Control a specific browser tab.",
+        pending_action_type="browser_control",
+        pending_param_keys=frozenset({"command", "app_name", "window_index", "tab_index"}),
+        pending_required_params=("command",),
+    ),
+    _action(
+        "browser_capabilities",
+        "low",
+        {"app_name": "string optional"},
+        "List supported commands for an allowlisted browser.",
+    ),
     _action(
         "music_control",
         "low",
@@ -320,6 +355,28 @@ _API_ACTION_SPECS = (
         {"query": "string", "provider": "apple|netease optional", "browser": "string optional"},
         "Search Apple Music or NetEase Cloud Music in an allowlisted browser.",
     ),
+    _action("music_status", "low", {"app_name": "string optional"}, "Read music playback status."),
+    _action(
+        "music_set_volume",
+        "low",
+        {"volume": "integer", "app_name": "string optional"},
+        "Set Apple Music volume from 0 to 100.",
+    ),
+    _action(
+        "music_search_app",
+        "medium",
+        {"query": "string", "app_name": "string optional", "confirm": "boolean optional"},
+        "Search inside the NetEase Cloud Music app using Accessibility automation.",
+        pending_action_type="music_search_app",
+        pending_param_keys=frozenset({"query", "app_name"}),
+        pending_required_params=("query",),
+    ),
+    _action(
+        "music_capabilities",
+        "low",
+        {"app_name": "string optional"},
+        "List supported commands for an allowlisted music app.",
+    ),
     _action(
         "pending_create",
         "low",
@@ -329,6 +386,16 @@ _API_ACTION_SPECS = (
     _action("pending_list", "low", {"status": "string optional"}, "List pending actions."),
     _action("pending_confirm", "medium", {"action_id": "string"}, "Confirm pending action."),
     _action("pending_cancel", "low", {"action_id": "string"}, "Cancel pending action."),
+    _action("audit_list", "low", {"limit": "integer optional"}, "List redacted local audit events."),
+    _action(
+        "workflow_plan",
+        "low",
+        {"name": "string optional", "steps": "array"},
+        "Validate and persist a workflow without executing it.",
+    ),
+    _action("workflow_execute", "variable", {"workflow_id": "string"}, "Execute or resume a workflow."),
+    _action("workflow_get", "low", {"workflow_id": "string"}, "Read a workflow state."),
+    _action("workflow_cancel", "low", {"workflow_id": "string"}, "Cancel a workflow."),
 )
 
 _EXTRA_PENDING_ACTION_SPECS = (

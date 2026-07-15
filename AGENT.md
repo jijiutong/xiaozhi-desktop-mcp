@@ -80,6 +80,12 @@ src/xiaozhi_desktop_mcp/tools/catalog.py
 
 src/xiaozhi_desktop_mcp/tools/projects.py
 从 `CC_ALLOWED_PROJECTS` 生成项目目录和目录名别名；解析后仍必须通过白名单校验。
+
+src/xiaozhi_desktop_mcp/tools/perception.py
+全屏/窗口截图和 macOS Vision OCR。HTTP 返回 base64，直接 MCP 截图工具返回 ImageContent。
+
+src/xiaozhi_desktop_mcp/tools/accessibility.py
+白名单 App 的 UI 树和语义操作入口；所有写操作必须先进入 pending action。
 ```
 
 Java 侧桥接文件：
@@ -103,6 +109,8 @@ Java 侧桥接文件：
 - 中风险动作需要在 `action_registry.py` 声明 `pending_action_type`、允许参数和必填参数。
 - API v2 不信任 `confirm=true`；中风险动作必须创建 pending action 后单独确认。
 - 新 App 能力优先新增显式 Driver 和 capabilities，不做任意坐标点击。
+- Accessibility 元素 ID 是当前 UI 树的路径，界面变化后必须重新 observe，不能假设 ID 永久稳定。
+- 全屏截图可能包含其他 App 的隐私信息；不要把图像或 UI value 写入日志和审计。
 - 新增或修改公共接口时同步 `docs/api.md`、必要时同步 `docs/clients.md` 和 `CHANGELOG.md`。
 - 先保持工具少而通用，不要把每句话都做成一个 action。
 
@@ -123,6 +131,12 @@ desktop_stop_cc
 desktop_health_detail
 desktop_config_summary
 desktop_tool_catalog
+desktop_screenshot
+desktop_window_screenshot
+desktop_ocr
+accessibility_capabilities
+accessibility_tree
+accessibility_action
 pending_action_create
 pending_action_list
 pending_action_confirm

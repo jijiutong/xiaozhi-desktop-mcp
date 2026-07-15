@@ -11,7 +11,7 @@ from ..safety import SafetyError, ensure_inside
 def finder_open_path(settings: Settings, path: str = "", reveal: bool = False) -> dict:
     """Open or reveal a path inside known safe roots."""
     try:
-        target = _resolve_allowed_path(settings, path)
+        target = resolve_allowed_path(settings, path)
     except SafetyError as exc:
         return fail(str(exc), "这个路径不在允许范围内，我没有打开。")
     if not target.exists():
@@ -27,7 +27,7 @@ def finder_open_path(settings: Settings, path: str = "", reveal: bool = False) -
     return ok({"path": str(target), "reveal": reveal}, "已在 Finder 打开。", "finder path opened")
 
 
-def _resolve_allowed_path(settings: Settings, path: str) -> Path:
+def resolve_allowed_path(settings: Settings, path: str) -> Path:
     value = path.strip()
     if not value:
         return settings.obsidian_vault

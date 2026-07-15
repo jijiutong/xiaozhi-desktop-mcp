@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- Added full-display and allowlisted-window screenshots with bounded PNG output and native MCP `ImageContent` responses.
+- Added macOS Vision OCR with structured text blocks and normalized bounds.
+- Added bounded Accessibility UI trees with element roles, labels, state, actions, bounds, and path-based element ids.
+- Added separately confirmed semantic UI actions for click, input, scroll, drag, menu selection, and safe-root file dialog selection.
+- Added a desktop perception intent category, capability discovery, permission documentation, and an LLM desktop-control roadmap.
+
 ## 3.0.0 - 2026-07-10
 
 ### Added

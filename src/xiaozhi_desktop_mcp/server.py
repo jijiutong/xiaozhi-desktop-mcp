@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import base64
+import json
 import logging
 import os
 import time
@@ -15,12 +17,17 @@ from collections.abc import Callable
 from functools import wraps
 from ipaddress import ip_address
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Image
+from mcp.types import CallToolResult, TextContent
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from .api_v2 import dispatch as api_v2_dispatch
 from .config import load_settings
+from .tools.accessibility import (
+    accessibility_capabilities as accessibility_capabilities_impl,
+    accessibility_tree as accessibility_tree_impl,
+)
 from .tools.apps import close_app as close_app_impl, open_app as open_app_impl
 from .tools.catalog import tool_catalog as desktop_tool_catalog_impl
 from .tools.cc_session import (
@@ -60,6 +67,11 @@ from .tools.pending_actions import (
     confirm_pending_action as pending_action_confirm_impl,
     create_pending_action as pending_action_create_impl,
     list_pending_actions as pending_action_list_impl,
+)
+from .tools.perception import (
+    capture_display as desktop_screenshot_impl,
+    capture_window as desktop_window_screenshot_impl,
+    ocr_desktop as desktop_ocr_impl,
 )
 from .tools.projects import (
     ask_cc_project as desktop_ask_cc_project_impl,
@@ -455,6 +467,106 @@ def desktop_focus_cc(session_id: str = "default") -> dict:
 def desktop_stop_cc(session_id: str = "default", allow_frontmost: bool = False) -> dict:
     """语音友好入口：退出 Claude Code/Codex 并关闭窗口。"""
     return desktop_stop_cc_impl(session_id, allow_frontmost)
+
+
+@mcp_tool()
+def desktop_screenshot(display_id: int = 1, max_width: int = 1600) -> CallToolResult:
+    """截取指定显示器并返回可供多模态 LLM 使用的 PNG base64。"""
+    return _mcp_image_result(desktop_screenshot_impl(display_id, max_width))
+
+
+@mcp_tool()
+def desktop_window_screenshot(app_name: str, window_index: int = 1, max_width: int = 1600) -> CallToolResult:
+    """截取白名单 App 的指定窗口并返回 PNG base64。"""
+    return _mcp_image_result(desktop_window_screenshot_impl(settings, app_name, window_index, max_width))
+
+
+@mcp_tool()
+def desktop_ocr(
+    source: str = "display",
+    app_name: str = "",
+    window_index: int = 1,
+    display_id: int = 1,
+    languages: str = "zh-Hans,en-US",
+) -> dict:
+    """使用 macOS Vision 识别屏幕或白名单 App 窗口中的文字。"""
+    return desktop_ocr_impl(settings, source, app_name, window_index, display_id, languages)
+
+
+@mcp_tool()
+def accessibility_capabilities(app_name: str) -> dict:
+    """查看白名单 App 支持的桌面感知和语义界面操作能力。"""
+    return accessibility_capabilities_impl(settings, app_name)
+
+
+@mcp_tool()
+def accessibility_tree(
+    app_name: str,
+    window_index: int = 1,
+    max_depth: int = 5,
+    max_elements: int = 200,
+    include_values: bool = False,
+) -> dict:
+    """读取白名单 App 窗口的 Accessibility UI 树和元素编号。"""
+    return accessibility_tree_impl(settings, app_name, window_index, max_depth, max_elements, include_values)
+
+
+@mcp_tool()
+def accessibility_action(
+    app_name: str,
+    command: str,
+    element_id: str = "",
+    target_element_id: str = "",
+    text: str = "",
+    direction: str = "down",
+    amount: int = 1,
+    path: str = "",
+    window_index: int = 1,
+) -> dict:
+    """创建待确认的语义 UI 操作；确认后可点击、输入、滚动、拖拽、选菜单或选择文件。"""
+    params = {
+        "app_name": app_name,
+        "command": command,
+        "element_id": element_id,
+        "target_element_id": target_element_id,
+        "text": text,
+        "direction": direction,
+        "amount": amount,
+        "path": path,
+        "window_index": window_index,
+    }
+    return pending_action_create_impl(
+        "accessibility_action",
+        params,
+        f"界面操作：{command}",
+        settings=settings,
+    )
+
+
+def _mcp_image_result(result: dict) -> CallToolResult:
+    """Return metadata plus an MCP ImageContent block while HTTP keeps JSON base64."""
+    if not result.get("success") or not result.get("image_base64"):
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps(result, ensure_ascii=False))],
+            structuredContent=result,
+            isError=not bool(result.get("success")),
+        )
+    try:
+        image_data = base64.b64decode(str(result["image_base64"]), validate=True)
+    except ValueError:
+        return CallToolResult(
+            content=[TextContent(type="text", text=json.dumps(result, ensure_ascii=False))],
+            structuredContent=result,
+            isError=True,
+        )
+    metadata = {key: value for key, value in result.items() if key != "image_base64"}
+    return CallToolResult(
+        content=[
+            TextContent(type="text", text=json.dumps(metadata, ensure_ascii=False)),
+            Image(data=image_data, format="png").to_image_content(),
+        ],
+        structuredContent=metadata,
+    )
 
 
 @mcp_tool()

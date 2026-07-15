@@ -6,7 +6,7 @@
 
 它不是新的小智后端，也不是任意 shell 执行器。这个项目的核心是：用 MCP / HTTP 接口暴露能力，同时用白名单、路径限制、待确认动作、鉴权和可观测日志把桌面自动化收进安全边界。
 
-[API](docs/api.md) · [3.0 Migration](docs/migration-v3.md) · [Client Examples](docs/clients.md) · [Operations](docs/operations.md) · [Security](docs/security.md) · [Xiaozhi Integration](docs/xiaozhi-integration.md)
+[API](docs/api.md) · [Desktop Control Roadmap](docs/desktop-control-roadmap.md) · [3.0 Migration](docs/migration-v3.md) · [Client Examples](docs/clients.md) · [Operations](docs/operations.md) · [Security](docs/security.md) · [Xiaozhi Integration](docs/xiaozhi-integration.md)
 
 License: MIT · Version: 3.0.0 · Python · FastMCP · FastAPI
 
@@ -76,6 +76,8 @@ flowchart LR
 | Apps | 打开、关闭、聚焦或查询 `ALLOWED_APPS` 白名单内的 macOS App |
 | Xcode | 打开项目、build、test、clean、查看最近错误 |
 | Browser / Finder / Clipboard | 标签页读取与控制、打开搜索、Finder 定位、剪贴板读写 |
+| Desktop Perception | 全屏/窗口截图、macOS Vision OCR、MCP 图像内容 |
+| Accessibility UI | UI 树、元素状态，以及确认后的点击、输入、滚动、拖拽、菜单和文件选择 |
 | Music | Apple Music 状态/音量控制、网易云播放和客户端内搜索 |
 | Pending Actions | SQLite 持久化、TTL、原子确认、防重复执行 |
 | Workflows | 多步骤计划、暂停确认、重启恢复、继续和取消 |
@@ -203,6 +205,8 @@ POST /api/v1/dispatch
 | 任务 | Action |
 | --- | --- |
 | 通用桌面意图 | `desktop_intent` |
+| 截图 / 窗口截图 / OCR | `desktop_screenshot` / `desktop_window_screenshot` / `desktop_ocr` |
+| UI 能力 / UI 树 / UI 操作 | `accessibility_capabilities` / `accessibility_tree` / `accessibility_action` |
 | 查看分类能力 | `category_registry` |
 | 保存一条记忆 | `remember` |
 | 搜索 Obsidian | `search_obsidian` |
@@ -261,6 +265,7 @@ POST /api/v1/dispatch
 | Xcode | 只能操作 `XCODE_ALLOWED_PROJECTS` |
 | Obsidian | 只能访问 `OBSIDIAN_VAULT` |
 | Finder | 只能打开 Obsidian、任务目录、允许项目内路径 |
+| Accessibility | 窗口/UI 目标必须是白名单 App；UI 写操作必须单独确认 |
 | 中风险动作 | 先创建 pending action，确认后执行 |
 | HTTP 鉴权 | 非 localhost 绑定必须设置 `DESKTOP_MCP_AUTH_TOKEN` |
 | 可观测性 | 请求和工具调用记录 request id、状态、耗时，不打印 token |
@@ -313,6 +318,7 @@ ruff check src tests
 | [Client Examples](docs/clients.md) | Java / Python / Go 接入示例 |
 | [Operations](docs/operations.md) | 启动、健康检查、常见排障 |
 | [Security](docs/security.md) | 白名单、路径限制、鉴权和日志 |
+| [Desktop Control Roadmap](docs/desktop-control-roadmap.md) | 完整 LLM 桌面操控差距、当前进度和后续闭环路线 |
 | [Xiaozhi Integration](docs/xiaozhi-integration.md) | 小智服务和 MCP bridge 接入 |
 | [Changelog](CHANGELOG.md) | 版本变化 |
 

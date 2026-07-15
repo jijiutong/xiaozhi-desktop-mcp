@@ -24,6 +24,7 @@ def health_detail(settings: Settings) -> dict:
         _allowed_projects_check(settings),
         _cli_check(settings),
         _terminal_check(settings),
+        _desktop_perception_dependencies_check(),
         _slash_policy_check(settings),
     ]
     failed = [check for check in checks if check["status"] == "fail"]
@@ -157,6 +158,29 @@ def _slash_policy_check(settings: Settings) -> dict:
     if policy not in {"allow", "confirm", "deny"}:
         return _check("cc_slash_default_policy", "warning", f"invalid slash default policy: {policy}")
     return _check("cc_slash_default_policy", "ok", "slash policy check passed", policy)
+
+
+def _desktop_perception_dependencies_check() -> dict:
+    commands = {
+        "screencapture": shutil.which("screencapture"),
+        "osascript": shutil.which("osascript"),
+        "swift": shutil.which("swift"),
+        "sips": shutil.which("sips"),
+    }
+    missing = [name for name, path in commands.items() if path is None]
+    if missing:
+        return _check(
+            "desktop_perception_dependencies",
+            "warning",
+            f"desktop perception commands were not found: {missing}",
+            commands,
+        )
+    return _check(
+        "desktop_perception_dependencies",
+        "ok",
+        "desktop perception commands found",
+        commands,
+    )
 
 
 def _is_writable(path: Path) -> bool:

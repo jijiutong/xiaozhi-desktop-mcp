@@ -9,6 +9,7 @@ from .action_registry import api_action_specs
 from .config import Settings
 from .responses import fail, ok
 from .storage import list_audit_events
+from .tools.accessibility import accessibility_action, accessibility_capabilities, accessibility_tree
 from .tools.apps import app_capabilities, app_status, close_app, focus_app, open_app
 from .tools.browser import (
     browser_capabilities,
@@ -37,6 +38,7 @@ from .tools.pending_actions import (
     create_pending_action,
     list_pending_actions,
 )
+from .tools.perception import capture_display, capture_window, ocr_desktop
 from .tools.projects import ask_cc_project, list_projects, open_cc_project_named, resolve_project
 from .tools.workflows import (
     ask_cc,
@@ -153,6 +155,28 @@ def _int(params: dict[str, Any], key: str, default: int = 0) -> int:
 
 def _remember(settings: Settings, params: dict[str, Any]) -> dict:
     return remember(settings, _str(params, "text"), _str(params, "tags", "xiaozhi,voice-memory"))
+
+
+def _accessibility_action(settings: Settings, params: dict[str, Any]) -> dict:
+    pending_params = {
+        "app_name": _str(params, "app_name"),
+        "command": _str(params, "command"),
+        "element_id": _str(params, "element_id"),
+        "target_element_id": _str(params, "target_element_id"),
+        "text": _str(params, "text"),
+        "direction": _str(params, "direction", "down"),
+        "amount": _int(params, "amount", 1),
+        "path": _str(params, "path"),
+        "window_index": _int(params, "window_index", 1),
+    }
+    return _confirm_or_pending(
+        settings,
+        params,
+        "accessibility_action",
+        pending_params,
+        lambda: accessibility_action(settings, **pending_params),
+        f"界面操作：{pending_params['command']}",
+    )
 
 
 def _app_close(settings: Settings, params: dict[str, Any]) -> dict:
@@ -396,6 +420,36 @@ def _workflow_execute(settings: Settings, params: dict[str, Any]) -> dict:
 
 
 _ACTION_HANDLERS: dict[str, ActionHandler] = {
+    "accessibility_capabilities": lambda settings, params: accessibility_capabilities(
+        settings, _str(params, "app_name")
+    ),
+    "accessibility_tree": lambda settings, params: accessibility_tree(
+        settings,
+        _str(params, "app_name"),
+        _int(params, "window_index", 1),
+        _int(params, "max_depth", 5),
+        _int(params, "max_elements", 200),
+        _bool(params, "include_values", False),
+    ),
+    "accessibility_action": _accessibility_action,
+    "desktop_screenshot": lambda settings, params: capture_display(
+        _int(params, "display_id", 1),
+        _int(params, "max_width", 1600),
+    ),
+    "desktop_window_screenshot": lambda settings, params: capture_window(
+        settings,
+        _str(params, "app_name"),
+        _int(params, "window_index", 1),
+        _int(params, "max_width", 1600),
+    ),
+    "desktop_ocr": lambda settings, params: ocr_desktop(
+        settings,
+        _str(params, "source", "display"),
+        _str(params, "app_name"),
+        _int(params, "window_index", 1),
+        _int(params, "display_id", 1),
+        _str(params, "languages", "zh-Hans,en-US"),
+    ),
     "remember": _remember,
     "app_open": lambda settings, params: open_app(settings, _str(params, "app_name")),
     "app_focus": lambda settings, params: focus_app(settings, _str(params, "app_name")),

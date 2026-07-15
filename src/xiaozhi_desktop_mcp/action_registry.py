@@ -135,6 +135,81 @@ def _policy_for(spec: ActionSpec) -> dict:
 
 
 _API_ACTION_SPECS = (
+    _action(
+        "accessibility_capabilities",
+        "low",
+        {"app_name": "string"},
+        "List desktop perception and semantic UI capabilities for an allowlisted app.",
+    ),
+    _action(
+        "accessibility_tree",
+        "low",
+        {
+            "app_name": "string",
+            "window_index": "integer optional",
+            "max_depth": "integer optional",
+            "max_elements": "integer optional",
+            "include_values": "boolean optional",
+        },
+        "Read the semantic Accessibility tree of an allowlisted app window.",
+    ),
+    _action(
+        "accessibility_action",
+        "medium",
+        {
+            "app_name": "string",
+            "command": "click|input|scroll|drag|menu_select|file_dialog_choose",
+            "element_id": "string optional",
+            "target_element_id": "string optional",
+            "text": "string optional",
+            "direction": "up|down|left|right optional",
+            "amount": "integer optional",
+            "path": "string optional",
+            "window_index": "integer optional",
+            "confirm": "boolean optional",
+        },
+        "Perform a semantic action in an allowlisted app after separate confirmation.",
+        pending_action_type="accessibility_action",
+        pending_param_keys=frozenset(
+            {
+                "app_name",
+                "command",
+                "element_id",
+                "target_element_id",
+                "text",
+                "direction",
+                "amount",
+                "path",
+                "window_index",
+            }
+        ),
+        pending_required_params=("app_name", "command"),
+        pending_title="执行界面操作",
+    ),
+    _action(
+        "desktop_screenshot",
+        "low",
+        {"display_id": "integer optional", "max_width": "integer optional"},
+        "Capture a macOS display for visual reasoning.",
+    ),
+    _action(
+        "desktop_window_screenshot",
+        "low",
+        {"app_name": "string", "window_index": "integer optional", "max_width": "integer optional"},
+        "Capture a window belonging to an allowlisted macOS app.",
+    ),
+    _action(
+        "desktop_ocr",
+        "low",
+        {
+            "source": "display|window optional",
+            "app_name": "string optional",
+            "window_index": "integer optional",
+            "display_id": "integer optional",
+            "languages": "string optional",
+        },
+        "Recognize text in a macOS display or allowlisted app window.",
+    ),
     _action("remember", "low", {"text": "string", "tags": "string optional"}, "Save memory to Obsidian."),
     _action("app_open", "low", {"app_name": "string"}, "Open an allowlisted macOS app."),
     _action("app_focus", "low", {"app_name": "string"}, "Focus an allowlisted macOS app."),

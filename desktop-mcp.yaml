@@ -18,6 +18,11 @@
     "网易云音乐": "NeteaseMusic"
   },
   "categories": {
+    "desktop": {
+      "default_app": "Finder",
+      "apps": ["Finder", "Obsidian", "Google Chrome", "Safari", "Xcode", "Terminal"],
+      "intents": ["screenshot", "window_screenshot", "ocr", "ui_tree", "ui_action", "capabilities"]
+    },
     "music": {
       "default_app": "Music",
       "apps": ["Music", "网易云音乐", "NetEase Cloud Music", "Spotify"],

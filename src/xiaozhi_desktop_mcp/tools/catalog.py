@@ -34,6 +34,36 @@ def tool_catalog() -> dict:
             "api_v1_action": "category_registry",
         },
         {
+            "name": "desktop_screenshot",
+            "risk": "low",
+            "use_when": "LLM 需要查看整个屏幕并进行视觉理解。",
+            "api_v1_action": "desktop_screenshot",
+        },
+        {
+            "name": "desktop_window_screenshot",
+            "risk": "low",
+            "use_when": "LLM 只需要查看某个白名单 App 的窗口。",
+            "api_v1_action": "desktop_window_screenshot",
+        },
+        {
+            "name": "desktop_ocr",
+            "risk": "low",
+            "use_when": "LLM 需要识别屏幕或窗口中的文字与位置。",
+            "api_v1_action": "desktop_ocr",
+        },
+        {
+            "name": "accessibility_tree",
+            "risk": "low",
+            "use_when": "LLM 需要理解按钮、输入框、菜单、弹窗和元素状态。",
+            "api_v1_action": "accessibility_tree",
+        },
+        {
+            "name": "accessibility_action",
+            "risk": "medium",
+            "use_when": "用户确认后按 element_id 点击、输入、滚动、拖拽、选菜单或选择文件。",
+            "api_v1_action": "accessibility_action",
+        },
+        {
             "name": "app_open",
             "risk": "low",
             "use_when": "用户要打开 Xcode、Obsidian、浏览器或其他白名单 App。",

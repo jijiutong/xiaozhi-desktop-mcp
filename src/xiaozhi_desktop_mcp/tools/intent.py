@@ -4,6 +4,7 @@ from typing import Any
 
 from ..config import Settings
 from ..responses import fail
+from .accessibility import accessibility_capabilities, accessibility_tree
 from .apps import app_capabilities, app_status, close_app, focus_app, open_app
 from .browser import (
     browser_capabilities,
@@ -27,6 +28,7 @@ from .music import (
 )
 from .obsidian import append_daily_note, append_note, create_note, open_note, save_memory, search_notes
 from .pending_actions import create_pending_action
+from .perception import capture_display, capture_window, ocr_desktop
 from .projects import ask_cc_project
 from .workflows import ask_cc, check_cc, continue_cc, focus_cc, open_cc_project, stop_cc
 from .xcode import open_xcode_project, xcode_build, xcode_clean, xcode_last_errors, xcode_test
@@ -346,6 +348,21 @@ def _browser_control(settings: Settings, params: dict[str, Any]) -> dict:
     return browser_control(settings, **pending_params)
 
 
+def _desktop_ui_action(settings: Settings, params: dict[str, Any]) -> dict:
+    pending_params = {
+        "app_name": _str(params, "app_name") or _str(params, "app"),
+        "command": _str(params, "command"),
+        "element_id": _str(params, "element_id"),
+        "target_element_id": _str(params, "target_element_id"),
+        "text": _str(params, "text"),
+        "direction": _str(params, "direction", "down"),
+        "amount": _int(params, "amount", 1),
+        "path": _str(params, "path"),
+        "window_index": _int(params, "window_index", 1),
+    }
+    return create_pending_action("accessibility_action", pending_params, settings=settings)
+
+
 def _str(params: dict[str, Any], key: str, default: str = "") -> str:
     return str(params.get(key, default))
 
@@ -367,6 +384,35 @@ def _int(params: dict[str, Any], key: str, default: int = 0) -> int:
 
 
 _HANDLERS = {
+    ("desktop", "screenshot"): lambda settings, params: capture_display(
+        _int(params, "display_id", 1), _int(params, "max_width", 1600)
+    ),
+    ("desktop", "window_screenshot"): lambda settings, params: capture_window(
+        settings,
+        _str(params, "app_name") or _str(params, "app"),
+        _int(params, "window_index", 1),
+        _int(params, "max_width", 1600),
+    ),
+    ("desktop", "ocr"): lambda settings, params: ocr_desktop(
+        settings,
+        _str(params, "source", "display"),
+        _str(params, "app_name") or _str(params, "app"),
+        _int(params, "window_index", 1),
+        _int(params, "display_id", 1),
+        _str(params, "languages", "zh-Hans,en-US"),
+    ),
+    ("desktop", "ui_tree"): lambda settings, params: accessibility_tree(
+        settings,
+        _str(params, "app_name") or _str(params, "app"),
+        _int(params, "window_index", 1),
+        _int(params, "max_depth", 5),
+        _int(params, "max_elements", 200),
+        _bool(params, "include_values", False),
+    ),
+    ("desktop", "ui_action"): _desktop_ui_action,
+    ("desktop", "capabilities"): lambda settings, params: accessibility_capabilities(
+        settings, _str(params, "app_name") or _str(params, "app")
+    ),
     ("app", "open"): _app_open,
     ("app", "close"): _app_close,
     ("app", "focus"): _app_focus,

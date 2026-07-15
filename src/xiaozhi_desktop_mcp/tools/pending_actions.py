@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -35,6 +36,8 @@ class PendingAction:
 
 
 _pending_actions: dict[str, PendingAction] = {}
+_AX_ELEMENT_ID = re.compile(r"^ax:(?:root|[1-9]\d*(?:\.[1-9]\d*)*)$")
+_AX_COMMANDS = frozenset({"click", "input", "scroll", "drag", "menu_select", "file_dialog_choose"})
 
 
 def create_pending_action(
@@ -185,6 +188,21 @@ def _from_record(record: dict) -> PendingAction:
 
 def _execute(settings: Settings, action: PendingAction) -> dict:
     params = action.params
+    if action.action_type == "accessibility_action":
+        from .accessibility import accessibility_action
+
+        return accessibility_action(
+            settings,
+            str(params.get("app_name", "")),
+            str(params.get("command", "")),
+            str(params.get("element_id", "")),
+            str(params.get("target_element_id", "")),
+            str(params.get("text", "")),
+            str(params.get("direction", "down")),
+            int(params.get("amount", 1)),
+            str(params.get("path", "")),
+            int(params.get("window_index", 1)),
+        )
     if action.action_type == "app_close":
         return close_app(settings, str(params.get("app_name", "")))
     if action.action_type == "browser_control":
@@ -314,6 +332,34 @@ def _validate_params(action_type: str, params: dict[str, Any]) -> str:
             return f"missing required param for {action_type}: {field_name}"
     if action_type == "cc_send_slash_command" and not str(params.get("command", "")).strip().startswith("/"):
         return "slash command must start with /"
+    if action_type == "accessibility_action":
+        command = str(params.get("command", "")).strip().lower().replace("-", "_")
+        element_id = str(params.get("element_id", "")).strip()
+        target_element_id = str(params.get("target_element_id", "")).strip()
+        if command not in _AX_COMMANDS:
+            return f"unsupported accessibility action: {command}"
+        if command in {"click", "input", "menu_select", "drag"} and not element_id:
+            return f"element_id is required for {command}"
+        if element_id and not _AX_ELEMENT_ID.fullmatch(element_id):
+            return "invalid element_id"
+        if target_element_id and not _AX_ELEMENT_ID.fullmatch(target_element_id):
+            return "invalid target_element_id"
+        if command == "drag" and not target_element_id:
+            return "target_element_id is required for drag"
+        if command == "scroll":
+            direction = str(params.get("direction", "down")).strip().lower()
+            if direction not in {"up", "down", "left", "right"}:
+                return "direction must be up, down, left, or right"
+            try:
+                amount = int(params.get("amount", 1))
+            except (TypeError, ValueError):
+                return "amount must be an integer"
+            if not 1 <= amount <= 20:
+                return "amount must be between 1 and 20"
+        if command == "file_dialog_choose" and not str(params.get("path", "")).strip():
+            return "path is required for file_dialog_choose"
+        if len(str(params.get("text", ""))) > 20000:
+            return "text exceeds 20000 characters"
     return ""
 
 

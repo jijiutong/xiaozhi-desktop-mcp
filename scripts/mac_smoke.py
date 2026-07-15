@@ -12,6 +12,11 @@ from xiaozhi_desktop_mcp.config import load_settings
 def main() -> int:
     parser = argparse.ArgumentParser(description="Read-only Xiaozhi Desktop MCP smoke checks.")
     parser.add_argument("--live", action="store_true", help="Read real browser tabs and music state on macOS.")
+    parser.add_argument(
+        "--perception-live",
+        action="store_true",
+        help="Capture the real display and read an app Accessibility tree without printing captured content.",
+    )
     parser.add_argument("--browser", default="chrome")
     parser.add_argument("--music", default="Music")
     args = parser.parse_args()
@@ -38,6 +43,14 @@ def main() -> int:
         "mac-smoke",
     )
     results.append(_check("music_capabilities", music.get("success"), music))
+    accessibility = dispatch(
+        settings,
+        "accessibility_capabilities",
+        {"app_name": args.browser},
+        "smoke-accessibility-capabilities",
+        "mac-smoke",
+    )
+    results.append(_check("accessibility_capabilities", accessibility.get("success"), accessibility))
 
     if args.live:
         if platform.system() != "Darwin":
@@ -67,6 +80,27 @@ def main() -> int:
                 "mac-smoke",
             )
             results.append(_check("music_status", status.get("success"), status))
+
+    if args.perception_live:
+        if platform.system() != "Darwin":
+            results.append(_check("perception_platform", False, {"error": "--perception-live requires macOS"}))
+        else:
+            screenshot = dispatch(
+                settings,
+                "desktop_screenshot",
+                {"display_id": 1, "max_width": 800},
+                "smoke-desktop-screenshot",
+                "mac-smoke",
+            )
+            results.append(_check("desktop_screenshot", screenshot.get("success"), screenshot))
+            tree = dispatch(
+                settings,
+                "accessibility_tree",
+                {"app_name": args.browser, "max_depth": 3, "max_elements": 50},
+                "smoke-accessibility-tree",
+                "mac-smoke",
+            )
+            results.append(_check("accessibility_tree", tree.get("success"), tree))
 
     summary = {"success": all(item["success"] for item in results), "checks": results}
     print(json.dumps(summary, ensure_ascii=False, indent=2))

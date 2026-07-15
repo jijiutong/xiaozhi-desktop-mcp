@@ -7,6 +7,11 @@ from ..config import Settings
 from ..responses import ok
 
 DEFAULT_CATEGORIES: dict[str, dict[str, Any]] = {
+    "desktop": {
+        "description": "Screen perception and semantic Accessibility UI control.",
+        "intents": ["screenshot", "window_screenshot", "ocr", "ui_tree", "ui_action", "capabilities"],
+        "default_app": "Finder",
+    },
     "music": {
         "description": "Music playback controls.",
         "intents": [

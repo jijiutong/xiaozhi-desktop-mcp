@@ -129,6 +129,12 @@ API v2 never treats `confirm=true` as authorization for medium-risk actions. It 
 ```text
 desktop_intent
 category_registry
+desktop_screenshot
+desktop_window_screenshot
+desktop_ocr
+accessibility_capabilities
+accessibility_tree
+accessibility_action
 remember
 list_projects
 resolve_project
@@ -204,6 +210,7 @@ Generic intent request:
 Built-in categories:
 
 ```text
+desktop  screenshot, window_screenshot, ocr, ui_tree, ui_action, capabilities
 music    open, play, pause, toggle, next, previous, search, search_app, status, volume, capabilities
 docs     remember, search, create, open, append, daily
 ai       open, send, continue, status, focus, stop, slash, model
@@ -218,6 +225,54 @@ Use `GET /api/v1/actions` for machine-readable parameters and risk levels.
 Use `GET /api/v2/actions` for parameter schemas, policy metadata, examples, and v1 compatibility markers.
 
 Medium-risk actions such as `ask_cc`, `app_close`, `browser_control`, `music_search_app`, and Xcode actions create a persistent pending action. API v1 retains the legacy `confirm=true` behavior for compatibility; API v2 always requires the separate `pending_confirm` action.
+
+## Desktop Perception and Accessibility
+
+Capture a display for an HTTP client:
+
+```json
+{
+  "action": "desktop_screenshot",
+  "params": {"display_id": 1, "max_width": 1600}
+}
+```
+
+HTTP returns PNG data in `data.image_base64`. The direct MCP `desktop_screenshot` and `desktop_window_screenshot` tools return metadata plus an MCP `ImageContent` block so a multimodal client can inspect the image directly.
+
+Read a semantic UI tree:
+
+```json
+{
+  "action": "accessibility_tree",
+  "params": {
+    "app_name": "chrome",
+    "window_index": 1,
+    "max_depth": 5,
+    "max_elements": 200,
+    "include_values": false
+  }
+}
+```
+
+Each result can include `element_id`, `role`, `subrole`, `title`, `description`, `identifier`, `enabled`, `focused`, `selected`, `actions`, and screen-space `bounds`. IDs are 1-based Accessibility child paths such as `ax:1.2`. Re-read the tree after the UI changes because an old path may no longer identify the same element.
+
+Create a confirmed semantic action:
+
+```json
+{
+  "action": "accessibility_action",
+  "params": {
+    "app_name": "chrome",
+    "command": "input",
+    "element_id": "ax:1.2",
+    "text": "desktop mcp"
+  }
+}
+```
+
+Supported commands are `click`, `input`, `scroll`, `drag`, `menu_select`, and `file_dialog_choose`. This call creates a pending action under API v2. Use `pending_confirm` with its `action_id` to execute it. Drag requires both `element_id` and `target_element_id`. File dialog paths must already exist inside configured safe roots.
+
+`desktop_ocr` supports `source=display|window` and returns recognized text blocks. Its normalized bounds use the macOS Vision coordinate system with the origin at the lower-left.
 
 ## Workflows
 

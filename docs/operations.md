@@ -95,9 +95,17 @@ Default path:
 
 The database contains pending actions, workflow state, and redacted audit metadata. Stop the service before copying it for backup. Deleting it resets only runtime state; it does not delete Obsidian notes or project files.
 
-## Browser and Accessibility Permissions
+## Screen Recording, Accessibility, and Automation Permissions
 
-Browser tab reading uses AppleScript. NetEase Cloud Music client search uses macOS Accessibility automation. Grant Automation/Accessibility access to the terminal or service process when macOS requests it.
+Desktop screenshots require macOS **Screen Recording** permission. UI tree and semantic actions require **Accessibility** and **Automation → System Events** permission. Browser tab reading also uses AppleScript. Grant these permissions to the terminal or service process that starts `xiaozhi-desktop-http` or the MCP server, then restart it.
+
+Permission symptoms:
+
+- empty/failed screenshots: Screen Recording is missing;
+- `not authorized to send Apple events`: Automation permission is missing;
+- `not allowed assistive access` or empty UI trees: Accessibility permission is missing.
+
+The first Vision OCR call invokes the system Swift runtime and may be slower while macOS builds its module cache.
 
 Safe metadata checks:
 
@@ -109,6 +117,12 @@ Read-only real App checks:
 
 ```bash
 .venv/bin/python scripts/mac_smoke.py --live --browser chrome --music Music
+```
+
+Explicit perception check; this briefly captures the real display but prints only pass/fail metadata:
+
+```bash
+.venv/bin/python scripts/mac_smoke.py --perception-live --browser chrome
 ```
 
 ## Checks Before Release

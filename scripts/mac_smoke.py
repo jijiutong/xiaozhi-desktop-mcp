@@ -19,6 +19,12 @@ def main() -> int:
     )
     parser.add_argument("--browser", default="chrome")
     parser.add_argument("--music", default="Music")
+    parser.add_argument(
+        "--observe-app",
+        action="append",
+        default=[],
+        help="Additional allowlisted app to observe during --perception-live; repeat for a matrix.",
+    )
     args = parser.parse_args()
 
     settings = load_settings()
@@ -93,14 +99,18 @@ def main() -> int:
                 "mac-smoke",
             )
             results.append(_check("desktop_screenshot", screenshot.get("success"), screenshot))
-            tree = dispatch(
-                settings,
-                "accessibility_tree",
-                {"app_name": args.browser, "max_depth": 3, "max_elements": 50},
-                "smoke-accessibility-tree",
-                "mac-smoke",
-            )
-            results.append(_check("accessibility_tree", tree.get("success"), tree))
+            observed_apps = list(dict.fromkeys([args.browser, *args.observe_app]))
+            for index, app_name in enumerate(observed_apps):
+                observation = dispatch(
+                    settings,
+                    "desktop_observe",
+                    {"app_name": app_name, "max_depth": 3, "max_elements": 50},
+                    f"smoke-desktop-observe-{index}",
+                    "mac-smoke",
+                )
+                results.append(
+                    _check(f"desktop_observe:{app_name}", observation.get("success"), observation)
+                )
 
     summary = {"success": all(item["success"] for item in results), "checks": results}
     print(json.dumps(summary, ensure_ascii=False, indent=2))

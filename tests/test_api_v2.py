@@ -15,6 +15,9 @@ def test_api_v2_actions_include_schema_and_policy():
     assert result["success"] is True
     assert result["version"] == "v2"
     assert actions["app_close"]["policy"]["default"] == "pending"
+    assert actions["app_close"]["policy"]["required_scope"] == "desktop:control"
+    assert actions["desktop_observe"]["policy"]["required_scope"] == "screen:read"
+    assert actions["config_summary"]["policy"]["required_scope"] == "state:read"
     assert actions["browser_open"]["param_schema"]["properties"]["url"]["type"] == "string"
     assert "url" in actions["browser_open"]["param_schema"]["required"]
     assert "next" in actions["music_control"]["param_schema"]["properties"]["command"]["enum"]
@@ -28,6 +31,30 @@ def test_api_v2_dispatch_adds_trace(settings):
     assert result["trace"]["client"] == "test-client"
     assert result["trace"]["normalized_action"] == "config_summary"
     assert result["policy"]["default"] == "allow"
+
+
+def test_api_v2_scopes_apply_to_stored_workflow_steps(settings):
+    planned = dispatch(
+        settings,
+        "workflow_plan",
+        {"steps": [{"action": "config_summary", "params": {}}]},
+        "plan",
+        "trusted-client",
+    )
+    workflow_id = planned["data"]["workflow"]["workflow_id"]
+
+    result = dispatch(
+        settings,
+        "workflow_execute",
+        {"workflow_id": workflow_id},
+        "execute",
+        "scoped-client",
+        frozenset({"desktop:control"}),
+    )
+
+    assert result["success"] is False
+    assert result["error_code"] == "SCOPE_DENIED"
+    assert result["data"]["required_scope"] == "state:read"
 
 
 def test_api_v2_rejects_invalid_params_before_dispatch(settings):
@@ -79,6 +106,24 @@ def test_api_v2_maps_accessibility_failures(settings, monkeypatch):
         "pending_confirm",
         {"action_id": action_id},
         "permission-confirm",
+        "test-client",
+    )
+
+    assert result["success"] is False
+    assert result["error_code"] == "PERMISSION_DENIED"
+
+
+def test_api_v2_maps_chinese_macos_accessibility_denial(settings, monkeypatch):
+    def denied(command, **_kwargs):
+        return subprocess.CompletedProcess(command, 1, "", "osascript 不允许辅助访问。 (-25211)")
+
+    monkeypatch.setattr(subprocess, "run", denied)
+
+    result = dispatch(
+        settings,
+        "desktop_observe",
+        {"app_name": "chrome"},
+        "permission-observe",
         "test-client",
     )
 

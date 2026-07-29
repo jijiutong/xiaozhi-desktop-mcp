@@ -43,3 +43,56 @@ def test_http_api_accepts_desktop_token_header(monkeypatch):
     response = client.get("/api/v1/actions", headers={"X-Desktop-Mcp-Token": "secret"})
 
     assert response.status_code == 200
+
+
+def test_http_token_scopes_restrict_dispatched_actions(monkeypatch):
+    monkeypatch.setenv("DESKTOP_MCP_AUTH_TOKEN", "secret")
+    monkeypatch.setenv("DESKTOP_MCP_AUTH_SCOPES", "desktop:control")
+    client = TestClient(app)
+    headers = {"Authorization": "Bearer secret"}
+
+    allowed = client.post(
+        "/api/v2/dispatch",
+        headers=headers,
+        json={"action": "app_capabilities", "params": {"app_name": "Obsidian"}},
+    )
+    denied = client.post(
+        "/api/v2/dispatch",
+        headers=headers,
+        json={"action": "config_summary", "params": {}},
+    )
+
+    assert allowed.status_code == 200
+    assert allowed.json()["success"] is True
+    assert denied.status_code == 403
+    assert denied.json()["error_code"] == "SCOPE_DENIED"
+    assert denied.json()["data"]["required_scope"] == "state:read"
+
+
+def test_http_token_scopes_cannot_be_bypassed_through_composite_actions(monkeypatch):
+    monkeypatch.setenv("DESKTOP_MCP_AUTH_TOKEN", "secret")
+    monkeypatch.setenv("DESKTOP_MCP_AUTH_SCOPES", "desktop:control")
+    client = TestClient(app)
+    headers = {"Authorization": "Bearer secret"}
+
+    intent = client.post(
+        "/api/v2/dispatch",
+        headers=headers,
+        json={
+            "action": "desktop_intent",
+            "params": {"category": "desktop", "intent": "screenshot", "params": {}},
+        },
+    )
+    workflow = client.post(
+        "/api/v2/dispatch",
+        headers=headers,
+        json={
+            "action": "workflow_plan",
+            "params": {"steps": [{"action": "config_summary", "params": {}}]},
+        },
+    )
+
+    assert intent.status_code == 403
+    assert intent.json()["data"]["required_scope"] == "screen:read"
+    assert workflow.status_code == 403
+    assert workflow.json()["data"]["required_scope"] == "state:read"

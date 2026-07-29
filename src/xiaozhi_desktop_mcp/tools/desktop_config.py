@@ -9,7 +9,16 @@ from ..responses import ok
 DEFAULT_CATEGORIES: dict[str, dict[str, Any]] = {
     "desktop": {
         "description": "Screen perception and semantic Accessibility UI control.",
-        "intents": ["screenshot", "window_screenshot", "ocr", "ui_tree", "ui_action", "capabilities"],
+        "intents": [
+            "screenshot",
+            "window_screenshot",
+            "ocr",
+            "observe",
+            "execute_step",
+            "ui_tree",
+            "ui_action",
+            "capabilities",
+        ],
         "default_app": "Finder",
     },
     "music": {

@@ -14,6 +14,7 @@ class ActionSpec:
     pending_param_keys: frozenset[str] = field(default_factory=frozenset)
     pending_required_params: tuple[str, ...] = ()
     pending_title: str = ""
+    param_schema: dict | None = None
 
     def catalog_entry(self) -> dict:
         entry = {
@@ -29,7 +30,7 @@ class ActionSpec:
     def v2_entry(self) -> dict:
         return {
             **self.catalog_entry(),
-            "param_schema": _param_schema(self.params),
+            "param_schema": self.param_schema or _param_schema(self.params),
             "policy": _policy_for(self),
             "examples": list(self.examples),
         }
@@ -55,6 +56,26 @@ def api_action_spec(action: str) -> ActionSpec | None:
     return _API_SPECS_BY_NAME.get(action.strip().lower().replace("-", "_"))
 
 
+def required_scope(action: str) -> str:
+    normalized = action.strip().lower().replace("-", "_")
+    if normalized in _SCREEN_READ_ACTIONS:
+        return "screen:read"
+    if normalized in _STATE_READ_ACTIONS:
+        return "state:read"
+    return "desktop:control"
+
+
+def scope_allows(action: str, authorized_scopes: frozenset[str] | None) -> bool:
+    if authorized_scopes is None or "*" in authorized_scopes:
+        return True
+    return required_scope(action) in authorized_scopes
+
+
+def workflow_replay_safe(action: str) -> bool:
+    """Return whether an interrupted workflow step can be replayed automatically."""
+    return action.strip().lower().replace("-", "_") in _WORKFLOW_REPLAY_SAFE_ACTIONS
+
+
 def xcode_params() -> dict[str, str]:
     return {
         "project_path": "string optional",
@@ -77,6 +98,7 @@ def _action(
     pending_param_keys: frozenset[str] | None = None,
     pending_required_params: tuple[str, ...] = (),
     pending_title: str = "",
+    param_schema: dict | None = None,
 ) -> ActionSpec:
     return ActionSpec(
         name=name,
@@ -88,6 +110,7 @@ def _action(
         pending_param_keys=pending_param_keys or frozenset(),
         pending_required_params=pending_required_params,
         pending_title=pending_title,
+        param_schema=param_schema,
     )
 
 
@@ -126,15 +149,157 @@ def _policy_for(spec: ActionSpec) -> dict:
         return {
             "default": "pending",
             "risk": spec.risk,
+            "required_scope": required_scope(spec.name),
             "pending_action_type": spec.pending_action_type,
             "confirm_param": "confirm",
         }
     if spec.risk == "low":
-        return {"default": "allow", "risk": spec.risk}
-    return {"default": "allow", "risk": spec.risk}
+        return {"default": "allow", "risk": spec.risk, "required_scope": required_scope(spec.name)}
+    return {"default": "allow", "risk": spec.risk, "required_scope": required_scope(spec.name)}
+
+
+_SCREEN_READ_ACTIONS = frozenset(
+    {
+        "desktop_screenshot",
+        "desktop_window_screenshot",
+        "desktop_ocr",
+        "desktop_observe",
+        "accessibility_capabilities",
+        "accessibility_tree",
+        "browser_tabs",
+        "browser_current",
+    }
+)
+_STATE_READ_ACTIONS = frozenset(
+    {"health", "config_summary", "tool_catalog", "category_registry", "audit_list"}
+)
+_WORKFLOW_REPLAY_SAFE_ACTIONS = frozenset(
+    {
+        *_SCREEN_READ_ACTIONS,
+        *_STATE_READ_ACTIONS,
+        "app_status",
+        "app_capabilities",
+        "check_cc",
+        "recent_memories",
+        "search_obsidian",
+        "list_projects",
+        "resolve_project",
+        "xcode_last_errors",
+        "browser_capabilities",
+        "music_status",
+        "music_capabilities",
+        "pending_list",
+    }
+)
 
 
 _API_ACTION_SPECS = (
+    _action(
+        "desktop_observe",
+        "low",
+        {
+            "app_name": "string",
+            "window_index": "integer optional",
+            "max_depth": "integer optional",
+            "max_elements": "integer optional",
+        },
+        "Create a short-lived semantic desktop observation for an allowlisted app.",
+    ),
+    _action(
+        "desktop_execute_step",
+        "medium",
+        {
+            "observation_id": "string",
+            "target": "object",
+            "preconditions": "object optional",
+            "action": "object",
+            "expectation": "object optional",
+            "idempotency_key": "string optional",
+            "timeout_ms": "integer optional",
+            "confirm": "boolean optional",
+        },
+        "Revalidate, execute once, and verify a semantic desktop action.",
+        pending_action_type="desktop_execute_step",
+        pending_param_keys=frozenset(
+            {
+                "observation_id",
+                "target",
+                "preconditions",
+                "action",
+                "expectation",
+                "idempotency_key",
+                "timeout_ms",
+            }
+        ),
+        pending_required_params=("observation_id", "target", "action"),
+        pending_title="执行并验证桌面操作",
+        param_schema={
+            "type": "object",
+            "properties": {
+                "observation_id": {"type": "string", "minLength": 1},
+                "target": {
+                    "type": "object",
+                    "properties": {
+                        "element_id": {"type": "string", "minLength": 1},
+                        "role": {"type": "string"},
+                        "subrole": {"type": "string"},
+                        "title": {"type": "string"},
+                        "description": {"type": "string"},
+                        "identifier": {"type": "string"},
+                    },
+                    "required": ["element_id"],
+                    "additionalProperties": False,
+                },
+                "preconditions": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {"type": "boolean"},
+                        "focused": {"type": "boolean"},
+                        "selected": {"type": "boolean"},
+                    },
+                    "additionalProperties": False,
+                },
+                "action": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "enum": ["click", "input", "scroll", "drag", "menu_select", "file_dialog_choose"],
+                        },
+                        "target_element_id": {"type": "string"},
+                        "text": {"type": "string"},
+                        "direction": {"type": "string", "enum": ["up", "down", "left", "right"]},
+                        "amount": {"type": "integer", "minimum": 1, "maximum": 20},
+                        "path": {"type": "string"},
+                    },
+                    "required": ["command"],
+                    "additionalProperties": False,
+                },
+                "expectation": {
+                    "type": "object",
+                    "properties": {
+                        "kind": {
+                            "type": "string",
+                            "enum": [
+                                "element_absent",
+                                "element_present",
+                                "element_enabled",
+                                "element_disabled",
+                                "tree_changed",
+                            ],
+                        }
+                    },
+                    "required": ["kind"],
+                    "additionalProperties": False,
+                },
+                "idempotency_key": {"type": "string", "minLength": 1},
+                "timeout_ms": {"type": "integer", "minimum": 100, "maximum": 30000},
+                "confirm": {"type": "boolean"},
+            },
+            "required": ["observation_id", "target", "action"],
+            "additionalProperties": False,
+        },
+    ),
     _action(
         "accessibility_capabilities",
         "low",

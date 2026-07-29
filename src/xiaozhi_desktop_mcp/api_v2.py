@@ -7,11 +7,11 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from .action_registry import api_action_spec, api_action_specs
+from .action_registry import api_action_spec, api_action_specs, required_scope
 from .api_v1 import dispatch as api_v1_dispatch
 from .config import Settings
 from .responses import ok
-from .storage import record_audit_event
+from .storage import WorkflowStore, record_audit_event
 from .validation import validate_params
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,7 @@ def dispatch(
     params: dict | None = None,
     request_id: str = "",
     client: str = "",
+    authorized_scopes: frozenset[str] | None = None,
 ) -> dict:
     """Dispatch through the stable v1 backend and add v2 policy/trace metadata."""
     started_at = time.monotonic()
@@ -62,6 +63,26 @@ def dispatch(
         _audit(settings, result, client, {}, started_at)
         return result
     clean_params = dict(params or {})
+    required_scopes = (
+        required_scopes_for_request(settings, normalized, clean_params)
+        if authorized_scopes is not None and "*" not in authorized_scopes
+        else frozenset({required_scope(normalized)})
+    )
+    missing_scopes = _missing_scopes(required_scopes, authorized_scopes)
+    if missing_scopes:
+        missing_scope = sorted(missing_scopes)[0]
+        result = _v2_error(
+            normalized,
+            request_id,
+            client,
+            "SCOPE_DENIED",
+            f"required scope is missing: {missing_scope}",
+            "客户端没有执行这个桌面动作的权限。",
+            {"required_scope": missing_scope, "required_scopes": sorted(required_scopes)},
+            spec.v2_entry()["policy"],
+        )
+        _audit(settings, result, client, clean_params, started_at)
+        return result
     validation_errors = validate_params(spec.v2_entry()["param_schema"], clean_params)
     if validation_errors:
         result = _v2_error(
@@ -93,11 +114,112 @@ def dispatch(
     return result
 
 
+def required_scopes_for_request(settings: Settings, action: str, params: dict | None = None) -> frozenset[str]:
+    """Resolve top-level and nested scopes for composite API requests."""
+    normalized = action.strip().lower().replace("-", "_")
+    clean_params = params if isinstance(params, dict) else {}
+    scopes = _embedded_action_scopes(normalized, clean_params)
+    if normalized == "workflow_plan":
+        scopes.update(_workflow_step_scopes(clean_params.get("steps", [])))
+    elif normalized == "workflow_execute":
+        workflow_id = str(clean_params.get("workflow_id", "")).strip()
+        workflow = WorkflowStore(settings).get(workflow_id) if workflow_id else None
+        if workflow:
+            scopes.update(_workflow_step_scopes(workflow.get("steps", [])))
+    return frozenset(scopes)
+
+
+def _missing_scopes(required: frozenset[str], authorized: frozenset[str] | None) -> frozenset[str]:
+    if authorized is None or "*" in authorized:
+        return frozenset()
+    return required - authorized
+
+
+def _embedded_action_scopes(action: str, params: dict) -> set[str]:
+    scopes = {required_scope(action)}
+    if action != "desktop_intent":
+        return scopes
+    category = str(params.get("category", "")).strip().lower()
+    intent = str(params.get("intent", "")).strip().lower()
+    nested_scope = _INTENT_READ_SCOPES.get((category, intent))
+    if nested_scope:
+        scopes.add(nested_scope)
+    return scopes
+
+
+def _workflow_step_scopes(raw_steps: Any) -> set[str]:
+    scopes: set[str] = set()
+    if not isinstance(raw_steps, list):
+        return scopes
+    for raw_step in raw_steps:
+        if not isinstance(raw_step, dict):
+            continue
+        if str(raw_step.get("kind", "action")).strip().lower() == "condition":
+            for branch_name in ("then", "else"):
+                branch = raw_step.get(branch_name)
+                if isinstance(branch, dict):
+                    scopes.update(
+                        _embedded_action_scopes(
+                            str(branch.get("action", "")).strip().lower().replace("-", "_"),
+                            branch.get("params", {}) if isinstance(branch.get("params"), dict) else {},
+                        )
+                    )
+        else:
+            scopes.update(
+                _embedded_action_scopes(
+                    str(raw_step.get("action", "")).strip().lower().replace("-", "_"),
+                    raw_step.get("params", {}) if isinstance(raw_step.get("params"), dict) else {},
+                )
+            )
+        compensation = raw_step.get("compensation")
+        if isinstance(compensation, dict):
+            scopes.update(
+                _embedded_action_scopes(
+                    str(compensation.get("action", "")).strip().lower().replace("-", "_"),
+                    compensation.get("params", {}) if isinstance(compensation.get("params"), dict) else {},
+                )
+            )
+    return scopes
+
+
+_INTENT_READ_SCOPES = {
+    ("desktop", "screenshot"): "screen:read",
+    ("desktop", "window_screenshot"): "screen:read",
+    ("desktop", "ocr"): "screen:read",
+    ("desktop", "observe"): "screen:read",
+    ("desktop", "ui_tree"): "screen:read",
+    ("desktop", "capabilities"): "screen:read",
+    ("browser", "tabs"): "screen:read",
+    ("browser", "current"): "screen:read",
+}
+
+
 def _execution_error_code(error: str) -> str:
     normalized = error.lower()
+    desktop_execution_codes = {
+        "recovery required": "RECOVERY_REQUIRED",
+        "observation expired": "OBSERVATION_EXPIRED",
+        "window changed": "WINDOW_CHANGED",
+        "target stale": "TARGET_STALE",
+        "target ambiguous": "TARGET_AMBIGUOUS",
+        "precondition failed": "PRECONDITION_FAILED",
+        "expectation timeout": "EXPECTATION_TIMEOUT",
+        "retry exhausted": "RETRY_EXHAUSTED",
+    }
+    for marker, code in desktop_execution_codes.items():
+        if marker in normalized:
+            return code
     if "timed out" in normalized or "timeout" in normalized:
         return "TIMEOUT"
-    permission_markers = ("permission", "not allowed to send keystrokes", "不允许发送按键", "1002")
+    permission_markers = (
+        "permission",
+        "not allowed to send keystrokes",
+        "not allowed assistive access",
+        "不允许发送按键",
+        "不允许辅助访问",
+        "1002",
+        "-25211",
+    )
     if any(marker in normalized for marker in permission_markers):
         return "PERMISSION_DENIED"
     if any(

@@ -9,8 +9,8 @@
 | 看见桌面 | 全屏截图、白名单 App 窗口截图、macOS Vision OCR、MCP ImageContent | 已完成第一版 |
 | 理解界面 | Accessibility UI 树：按钮、输入框、菜单、弹窗、值、启用/聚焦/选中状态、可执行动作和 bounds | 已完成第一版 |
 | 操作界面 | 按 `element_id` 点击、输入、滚动、拖拽、菜单选择和安全路径文件选择 | 已完成第一版 |
-| 闭环验证 | 调用方手动执行“观察 → 操作 → 再观察” | 待实现 |
-| 自主规划 | 只执行调用方传入的固定 workflow steps | 待实现 |
+| 闭环验证 | 4.0 支持 observation 绑定、动作前重校验、幂等执行和 expectation 轮询 | 4.0 已完成 |
+| 动态工作流 | 只读重试、受限 wait、条件分支、安全补偿、租约与恢复；LLM 规划仍在外部 | 4.0 已完成 |
 | 通用 App 可靠性 | 依赖 App 的 Accessibility 质量和 macOS 权限 | 持续增强 |
 
 ## 第一阶段：桌面感知和语义操作
@@ -37,6 +37,8 @@ accessibility_action
 - 不向客户端暴露任意 JavaScript、任意 shell 或不受约束的坐标点击。
 
 ## 第二阶段：Observe–Act–Verify 闭环
+
+4.0 已提供 `desktop_observe` 和 `desktop_execute_step`，覆盖 observation TTL、窗口/语义目标重校验、结构化前置条件、pending confirmation、幂等执行和操作后 expectation 轮询。后续继续增强 App 专用稳定定位器和更细粒度 UI diff。
 
 目标流程：
 

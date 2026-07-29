@@ -13,11 +13,13 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from .action_registry import required_scope
 from .api_v1 import actions_catalog as api_v1_actions_catalog, api_health as api_v1_health, dispatch as api_v1_dispatch
 from .api_v2 import (
     ApiV2DispatchRequest,
     actions_catalog as api_v2_actions_catalog,
     dispatch as api_v2_dispatch,
+    required_scopes_for_request,
 )
 from .config import load_settings
 
@@ -40,6 +42,7 @@ async def require_auth_token(request: Request, call_next):
     request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
     client_host = request.client.host if request.client else ""
     token = os.getenv("DESKTOP_MCP_AUTH_TOKEN", "").strip()
+    request.state.auth_scopes = _configured_auth_scopes() if token else frozenset({"*"})
     if token and request.url.path.startswith(_PROTECTED_PREFIXES):
         auth_header = request.headers.get("authorization", "")
         header_token = request.headers.get("x-desktop-mcp-token", "")
@@ -97,8 +100,17 @@ def http_api_v1_actions() -> dict:
 
 
 @app.post("/api/v1/dispatch")
-def http_api_v1_dispatch(req: ApiV1DispatchRequest) -> dict:
+def http_api_v1_dispatch(req: ApiV1DispatchRequest, request: Request) -> Any:
     """Language-agnostic dispatch endpoint for Java, Python, Go, and other clients."""
+    scopes = getattr(request.state, "auth_scopes", frozenset({"*"}))
+    required_scopes = (
+        required_scopes_for_request(settings, req.action, req.params)
+        if "*" not in scopes
+        else frozenset({required_scope(req.action)})
+    )
+    missing_scopes = required_scopes - scopes if "*" not in scopes else frozenset()
+    if missing_scopes:
+        return _scope_denied_response(req.action, req.request_id, required_scopes, missing_scopes)
     return api_v1_dispatch(settings, req.action, req.params, req.request_id)
 
 
@@ -109,9 +121,13 @@ def http_api_v2_actions() -> dict:
 
 
 @app.post("/api/v2/dispatch")
-def http_api_v2_dispatch(req: ApiV2DispatchRequest) -> dict:
+def http_api_v2_dispatch(req: ApiV2DispatchRequest, request: Request) -> Any:
     """API v2 dispatch with policy and trace metadata around the stable v1 backend."""
-    return api_v2_dispatch(settings, req.action, req.params, req.request_id, req.client)
+    scopes = getattr(request.state, "auth_scopes", frozenset({"*"}))
+    result = api_v2_dispatch(settings, req.action, req.params, req.request_id, req.client, scopes)
+    if result.get("error_code") == "SCOPE_DENIED":
+        return JSONResponse(status_code=403, content=result)
+    return result
 
 
 def main() -> None:
@@ -127,6 +143,35 @@ def main() -> None:
 
 def _is_authorized(auth_header: str, header_token: str, token: str) -> bool:
     return auth_header == f"Bearer {token}" or header_token == token
+
+
+def _configured_auth_scopes() -> frozenset[str]:
+    raw = os.getenv("DESKTOP_MCP_AUTH_SCOPES", "*")
+    scopes = frozenset(item.strip() for item in raw.split(",") if item.strip())
+    return scopes or frozenset({"*"})
+
+
+def _scope_denied_response(
+    action: str,
+    request_id: str,
+    required_scopes: frozenset[str] | None = None,
+    missing_scopes: frozenset[str] | None = None,
+) -> JSONResponse:
+    all_required = required_scopes or frozenset({required_scope(action)})
+    required = sorted(missing_scopes or all_required)[0]
+    return JSONResponse(
+        status_code=403,
+        content={
+            "success": False,
+            "request_id": request_id,
+            "action": action,
+            "spoken_message": "",
+            "error_spoken_message": "客户端没有执行这个桌面动作的权限。",
+            "error": f"required scope is missing: {required}",
+            "error_code": "SCOPE_DENIED",
+            "data": {"required_scope": required, "required_scopes": sorted(all_required)},
+        },
+    )
 
 
 def _is_loopback_host(host: str) -> bool:

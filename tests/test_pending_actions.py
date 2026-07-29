@@ -28,6 +28,40 @@ def test_pending_create_rejects_empty_project_alias():
     assert "project" in result["error"]
 
 
+def test_verified_desktop_pending_action_validates_nested_command_fields(settings):
+    invalid_drag = create_pending_action(
+        "desktop_execute_step",
+        {
+            "observation_id": "obs_example",
+            "target": {"element_id": "ax:1"},
+            "preconditions": {},
+            "action": {"command": "drag"},
+            "expectation": {"kind": "tree_changed"},
+            "idempotency_key": "drag-once",
+            "timeout_ms": 5000,
+        },
+        settings=settings,
+    )
+    invalid_precondition = create_pending_action(
+        "desktop_execute_step",
+        {
+            "observation_id": "obs_example",
+            "target": {"element_id": "ax:1"},
+            "preconditions": {"enabled": "yes"},
+            "action": {"command": "click"},
+            "expectation": {"kind": "tree_changed"},
+            "idempotency_key": "click-once",
+            "timeout_ms": 5000,
+        },
+        settings=settings,
+    )
+
+    assert invalid_drag["success"] is False
+    assert "target_element_id" in invalid_drag["error"]
+    assert invalid_precondition["success"] is False
+    assert "preconditions" in invalid_precondition["error"]
+
+
 def test_api_ask_cc_creates_pending_action(settings):
     result = dispatch(settings, "ask_cc", {"text": "hello"}, "req-1")
 

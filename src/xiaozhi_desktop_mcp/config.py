@@ -52,6 +52,9 @@ class Settings:
     cc_log_enabled: bool
     cc_status_tail_chars: int
     cc_max_return_chars: int
+    observation_ttl_seconds: int = 120
+    auth_scopes: frozenset[str] = frozenset({"*"})
+    workflow_lease_seconds: int = 300
 
 
 def _split_csv(value: str) -> frozenset[str]:
@@ -230,6 +233,9 @@ def load_settings() -> Settings:
     cc_log_enabled = _bool_env("CC_LOG_ENABLED", False)
     cc_status_tail_chars = _int_env("CC_STATUS_TAIL_CHARS", 4000)
     cc_max_return_chars = _int_env("CC_MAX_RETURN_CHARS", 8000)
+    observation_ttl_seconds = max(10, _int_env("DESKTOP_MCP_OBSERVATION_TTL_SECONDS", 120))
+    auth_scopes = _split_csv(os.getenv("DESKTOP_MCP_AUTH_SCOPES", "*")) or frozenset({"*"})
+    workflow_lease_seconds = max(30, _int_env("DESKTOP_MCP_WORKFLOW_LEASE_SECONDS", 300))
     return Settings(
         obsidian_vault=vault,
         obsidian_memory_file=memory_file,
@@ -260,4 +266,7 @@ def load_settings() -> Settings:
         cc_log_enabled=cc_log_enabled,
         cc_status_tail_chars=cc_status_tail_chars,
         cc_max_return_chars=cc_max_return_chars,
+        observation_ttl_seconds=observation_ttl_seconds,
+        auth_scopes=auth_scopes,
+        workflow_lease_seconds=workflow_lease_seconds,
     )

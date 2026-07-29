@@ -10,6 +10,10 @@ from .config import Settings
 from .responses import ok
 
 
+class WorkflowLeaseLost(RuntimeError):
+    """Raised when a stale workflow runner attempts to persist state."""
+
+
 class PendingActionStore:
     """SQLite-backed pending action lifecycle with atomic single-use claims."""
 
@@ -146,6 +150,7 @@ class WorkflowStore:
 
     def __init__(self, settings: Settings):
         self.path = settings.state_db_path
+        self.lease_seconds = settings.workflow_lease_seconds
 
     def create(self, workflow_id: str, name: str, steps: list[dict]) -> dict:
         now = _now_iso()
@@ -170,7 +175,64 @@ class WorkflowStore:
             ).fetchone()
         return _workflow_row(row) if row else None
 
-    def update(self, workflow_id: str, *, status: str, steps: list[dict], current_step: int) -> dict | None:
+    def append_event(
+        self,
+        workflow_id: str,
+        event_type: str,
+        *,
+        step_index: int = -1,
+        details: dict | None = None,
+    ) -> None:
+        with _connect(self.path) as connection:
+            _init_schema(connection)
+            connection.execute(
+                """
+                INSERT INTO workflow_events (
+                    event_id, workflow_id, step_index, event_type, details, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    uuid4().hex,
+                    workflow_id,
+                    step_index,
+                    event_type,
+                    json.dumps(details or {}, ensure_ascii=False, sort_keys=True),
+                    _now_iso(),
+                ),
+            )
+
+    def events(self, workflow_id: str, limit: int = 100) -> list[dict]:
+        safe_limit = min(max(limit, 1), 500)
+        with _connect(self.path) as connection:
+            _init_schema(connection)
+            rows = connection.execute(
+                """
+                SELECT event_id, workflow_id, step_index, event_type, details, created_at
+                FROM workflow_events WHERE workflow_id = ? ORDER BY id LIMIT ?
+                """,
+                (workflow_id, safe_limit),
+            ).fetchall()
+        return [
+            {
+                "event_id": row["event_id"],
+                "workflow_id": row["workflow_id"],
+                "step_index": row["step_index"],
+                "event_type": row["event_type"],
+                "details": json.loads(row["details"]),
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ]
+
+    def update(
+        self,
+        workflow_id: str,
+        *,
+        status: str,
+        steps: list[dict],
+        current_step: int,
+        run_token: str = "",
+    ) -> dict | None:
         with _connect(self.path) as connection:
             _init_schema(connection)
             connection.execute("BEGIN IMMEDIATE")
@@ -182,20 +244,40 @@ class WorkflowStore:
                 connection.rollback()
                 return None
             current = _workflow_row(row)
+            if run_token and str(row["run_token"] or "") != run_token:
+                connection.rollback()
+                raise WorkflowLeaseLost(workflow_id)
             if current["status"] == "cancelled" and status != "cancelled":
                 connection.rollback()
+                if run_token:
+                    raise WorkflowLeaseLost(workflow_id)
                 return current
+            now = datetime.now(timezone.utc)
+            next_token = run_token if status == "running" else None
+            lease_expires_at = (
+                (now + timedelta(seconds=self.lease_seconds)).isoformat() if next_token else None
+            )
             connection.execute(
                 """
-                UPDATE workflows SET status = ?, steps = ?, current_step = ?, updated_at = ?
+                UPDATE workflows
+                SET status = ?, steps = ?, current_step = ?, updated_at = ?,
+                    run_token = ?, lease_expires_at = ?
                 WHERE workflow_id = ?
                 """,
-                (status, json.dumps(steps, ensure_ascii=False), current_step, _now_iso(), workflow_id),
+                (
+                    status,
+                    json.dumps(steps, ensure_ascii=False),
+                    current_step,
+                    now.isoformat(),
+                    next_token,
+                    lease_expires_at,
+                    workflow_id,
+                ),
             )
             connection.commit()
         return self.get(workflow_id)
 
-    def claim_execution(self, workflow_id: str) -> tuple[dict | None, str, str]:
+    def claim_execution(self, workflow_id: str) -> tuple[dict | None, str, str, str]:
         """Atomically grant one caller ownership of workflow execution."""
         with _connect(self.path) as connection:
             _init_schema(connection)
@@ -206,18 +288,37 @@ class WorkflowStore:
             ).fetchone()
             if not row:
                 connection.rollback()
-                return None, "", "not_found"
+                return None, "", "not_found", ""
             workflow = _workflow_row(row)
             previous_status = str(workflow["status"])
-            if previous_status not in {"planned", "waiting_confirmation"}:
+            if previous_status == "running":
+                raw_expiry = str(row["lease_expires_at"] or "")
+                lease_expiry = (
+                    datetime.fromisoformat(raw_expiry)
+                    if raw_expiry
+                    else datetime.fromisoformat(str(workflow["updated_at"]))
+                    + timedelta(seconds=self.lease_seconds)
+                )
+                if lease_expiry > datetime.now(timezone.utc):
+                    connection.rollback()
+                    return workflow, previous_status, previous_status, ""
+                previous_status = "recovering"
+            elif previous_status not in {"planned", "waiting_confirmation", "waiting_condition"}:
                 connection.rollback()
-                return workflow, previous_status, previous_status
+                return workflow, previous_status, previous_status, ""
+            run_token = uuid4().hex
+            now = datetime.now(timezone.utc)
+            lease_expires_at = (now + timedelta(seconds=self.lease_seconds)).isoformat()
             connection.execute(
-                "UPDATE workflows SET status = 'running', updated_at = ? WHERE workflow_id = ?",
-                (_now_iso(), workflow_id),
+                """
+                UPDATE workflows
+                SET status = 'running', updated_at = ?, run_token = ?, lease_expires_at = ?
+                WHERE workflow_id = ?
+                """,
+                (now.isoformat(), run_token, lease_expires_at, workflow_id),
             )
             connection.commit()
-        return self.get(workflow_id), previous_status, ""
+        return self.get(workflow_id), previous_status, "", run_token
 
     def cancel(self, workflow_id: str) -> dict | None:
         with _connect(self.path) as connection:
@@ -235,11 +336,103 @@ class WorkflowStore:
                 connection.rollback()
                 return workflow
             connection.execute(
-                "UPDATE workflows SET status = 'cancelled', updated_at = ? WHERE workflow_id = ?",
+                """
+                UPDATE workflows
+                SET status = 'cancelled', updated_at = ?, run_token = NULL, lease_expires_at = NULL
+                WHERE workflow_id = ?
+                """,
                 (_now_iso(), workflow_id),
             )
             connection.commit()
         return self.get(workflow_id)
+
+
+class ObservationStore:
+    """Short-lived, privacy-bounded desktop observations."""
+
+    def __init__(self, settings: Settings):
+        self.path = settings.state_db_path
+        self.ttl_seconds = settings.observation_ttl_seconds
+
+    def create(self, observation_id: str, payload: dict) -> dict:
+        captured_at = datetime.now(timezone.utc)
+        expires_at = captured_at + timedelta(seconds=self.ttl_seconds)
+        record = {
+            **payload,
+            "observation_id": observation_id,
+            "captured_at": captured_at.isoformat(),
+            "expires_at": expires_at.isoformat(),
+        }
+        with _connect(self.path) as connection:
+            _init_schema(connection)
+            connection.execute("DELETE FROM observations WHERE expires_at <= ?", (_now_iso(),))
+            connection.execute(
+                """
+                INSERT INTO observations (observation_id, payload, created_at, expires_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    observation_id,
+                    json.dumps(record, ensure_ascii=False, sort_keys=True),
+                    record["captured_at"],
+                    record["expires_at"],
+                ),
+            )
+        return record
+
+    def get(self, observation_id: str) -> dict | None:
+        with _connect(self.path) as connection:
+            _init_schema(connection)
+            row = connection.execute(
+                "SELECT payload, expires_at FROM observations WHERE observation_id = ?",
+                (observation_id,),
+            ).fetchone()
+        if not row:
+            return None
+        record = json.loads(row["payload"])
+        record["expired"] = datetime.fromisoformat(row["expires_at"]) <= datetime.now(timezone.utc)
+        return record
+
+
+class IdempotencyStore:
+    """Fail-closed claim records for side-effecting desktop steps."""
+
+    def __init__(self, settings: Settings):
+        self.path = settings.state_db_path
+
+    def claim(self, key: str) -> tuple[str, dict | None]:
+        with _connect(self.path) as connection:
+            _init_schema(connection)
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT status, result FROM idempotency_keys WHERE idempotency_key = ?",
+                (key,),
+            ).fetchone()
+            if row:
+                connection.rollback()
+                result = json.loads(row["result"]) if row["result"] else None
+                return str(row["status"]), result
+            connection.execute(
+                """
+                INSERT INTO idempotency_keys (idempotency_key, status, result, created_at, updated_at)
+                VALUES (?, 'executing', NULL, ?, ?)
+                """,
+                (key, _now_iso(), _now_iso()),
+            )
+            connection.commit()
+        return "claimed", None
+
+    def resolve(self, key: str, result: dict) -> None:
+        status = "completed" if result.get("success") else "failed"
+        with _connect(self.path) as connection:
+            _init_schema(connection)
+            connection.execute(
+                """
+                UPDATE idempotency_keys SET status = ?, result = ?, updated_at = ?
+                WHERE idempotency_key = ? AND status = 'executing'
+                """,
+                (status, json.dumps(result, ensure_ascii=False), _now_iso(), key),
+            )
 
 
 def record_audit_event(
@@ -322,6 +515,34 @@ def _connect(path: Path) -> sqlite3.Connection:
 def _init_schema(connection: sqlite3.Connection) -> None:
     connection.execute(
         """
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            version INTEGER PRIMARY KEY,
+            applied_at TEXT NOT NULL
+        )
+        """
+    )
+    connection.commit()
+    connection.execute("BEGIN IMMEDIATE")
+    try:
+        applied = {int(row[0]) for row in connection.execute("SELECT version FROM schema_migrations").fetchall()}
+        migrations = ((1, _migration_1), (2, _migration_2), (3, _migration_3), (4, _migration_4))
+        for version, migration in migrations:
+            if version in applied:
+                continue
+            migration(connection)
+            connection.execute(
+                "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",
+                (version, _now_iso()),
+            )
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+
+
+def _migration_1(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS audit_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             event_id TEXT NOT NULL UNIQUE,
@@ -364,6 +585,58 @@ def _init_schema(connection: sqlite3.Connection) -> None:
         )
         """
     )
+
+
+def _migration_2(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS observations (
+            observation_id TEXT PRIMARY KEY,
+            payload TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL
+        )
+        """
+    )
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_observations_expires_at ON observations(expires_at)")
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS idempotency_keys (
+            idempotency_key TEXT PRIMARY KEY,
+            status TEXT NOT NULL,
+            result TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+
+
+def _migration_3(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS workflow_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_id TEXT NOT NULL UNIQUE,
+            workflow_id TEXT NOT NULL,
+            step_index INTEGER NOT NULL,
+            event_type TEXT NOT NULL,
+            details TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_workflow_events_workflow_id ON workflow_events(workflow_id, id)"
+    )
+
+
+def _migration_4(connection: sqlite3.Connection) -> None:
+    columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(workflows)").fetchall()}
+    if "run_token" not in columns:
+        connection.execute("ALTER TABLE workflows ADD COLUMN run_token TEXT")
+    if "lease_expires_at" not in columns:
+        connection.execute("ALTER TABLE workflows ADD COLUMN lease_expires_at TEXT")
 
 
 def _now_iso() -> str:

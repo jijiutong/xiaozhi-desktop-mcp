@@ -16,7 +16,7 @@
 
 不要把它做成新的小智服务器，也不要在这里实现 LLM/RAG/ASR/TTS。
 
-当前稳定版本是 `3.0.0`。继续保持 `/api/v1/...` 响应 envelope 兼容，不随意改 action 名和字段名；新客户端优先使用 `/api/v2/actions` 和 `/api/v2/dispatch`。
+当前稳定版本是 `4.0.0`。继续保持 `/api/v1/...` 响应 envelope 兼容，不随意改 action 名和字段名；新客户端优先使用 `/api/v2/actions` 和 `/api/v2/dispatch`。
 
 ## 当前重要文件
 
@@ -34,10 +34,16 @@ src/xiaozhi_desktop_mcp/api_v2.py
 Schema 校验、风险策略、稳定错误码、trace 和脱敏审计入口。
 
 src/xiaozhi_desktop_mcp/storage.py
-SQLite 状态库：pending actions、workflows、audit events。
+SQLite 状态库：版本迁移、pending actions、observations、幂等记录、带租约的 workflows 和脱敏 events/audit。
 
 src/xiaozhi_desktop_mcp/workflows_v2.py
 可持久化、可暂停确认、可恢复和取消的多步骤工作流。
+
+src/xiaozhi_desktop_mcp/observations.py
+4.0 短期桌面 observation、窗口身份和隐私有界 UI 指纹。
+
+src/xiaozhi_desktop_mcp/execution.py
+4.0 桌面动作的重校验、前置条件、幂等执行和操作后验证闭环。
 
 src/xiaozhi_desktop_mcp/safety.py
 路径、App、CLI、slash policy 等安全边界。

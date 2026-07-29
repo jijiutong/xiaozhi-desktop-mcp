@@ -2,8 +2,19 @@
 
 ## Unreleased
 
+## 4.0.0 - 2026-07-29
+
 ### Added
 
+- Added short-lived `desktop_observe` snapshots with window identity, privacy-bounded semantic elements, expiration, and tree fingerprints.
+- Added confirmed `desktop_execute_step` execution with window and target revalidation, structured preconditions, idempotency keys, and post-action expectation polling.
+- Added stable desktop execution errors including `OBSERVATION_EXPIRED`, `WINDOW_CHANGED`, `TARGET_STALE`, `PRECONDITION_FAILED`, `EXPECTATION_TIMEOUT`, and `RECOVERY_REQUIRED`.
+- Added explicit nested JSON Schema validation for verified desktop execution.
+- Added versioned SQLite migrations plus observation and idempotency state.
+- Added bounded read-only workflow retries and wait steps, restricted condition branches, and explicitly declared low-risk compensation actions.
+- Added workflow execution leases, fencing, redacted lifecycle events, automatic read-only recovery, and fail-closed recovery for uncertain write outcomes.
+- Added authenticated HTTP token scopes for screen reads, state reads, and desktop control.
+- Added a repeatable macOS observation smoke matrix for Chrome, Safari, Finder, Obsidian, Xcode, and Terminal.
 - Added full-display and allowlisted-window screenshots with bounded PNG output and native MCP `ImageContent` responses.
 - Added macOS Vision OCR with structured text blocks and normalized bounds.
 - Added bounded Accessibility UI trees with element roles, labels, state, actions, bounds, and path-based element ids.

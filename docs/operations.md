@@ -48,6 +48,7 @@ If you bind the HTTP server to a non-localhost address, set `DESKTOP_MCP_AUTH_TO
 
 ```bash
 export DESKTOP_MCP_AUTH_TOKEN="change-me"
+export DESKTOP_MCP_AUTH_SCOPES="screen:read,state:read,desktop:control"
 curl -H "Authorization: Bearer change-me" http://127.0.0.1:8765/api/v1/actions
 ```
 
@@ -81,7 +82,9 @@ The service creates directories when writing. A missing inbox directory is a war
 
 - Registered visible sessions are in memory.
 - Pending actions and workflows are persisted in `DESKTOP_MCP_STATE_DB`.
+- Short-lived observations and desktop-step idempotency records are persisted in `DESKTOP_MCP_STATE_DB`.
 - Restarting `xiaozhi-desktop-http` keeps pending actions, workflow progress, and audit events.
+- Workflow execution leases expire after `DESKTOP_MCP_WORKFLOW_LEASE_SECONDS` (default 300). Recovery replays only explicitly read-only steps; uncertain write outcomes stop with `RECOVERY_REQUIRED`.
 - Pending actions older than `DESKTOP_MCP_PENDING_TTL_SECONDS` expire automatically.
 - Obsidian notes and task files are written to disk and persist.
 
@@ -93,7 +96,9 @@ Default path:
 ~/.local/share/xiaozhi-desktop-mcp/state.db
 ```
 
-The database contains pending actions, workflow state, and redacted audit metadata. Stop the service before copying it for backup. Deleting it resets only runtime state; it does not delete Obsidian notes or project files.
+The database contains pending actions, observations, idempotency records, workflow state, migration versions, and redacted audit metadata. Stop the service before copying it for backup. Deleting it resets only runtime state; it does not delete Obsidian notes or project files.
+
+4.0 applies ordered SQLite migrations automatically. Back up the database before the first 4.0 start. Use the backup if rolling back to 3.x.
 
 ## Screen Recording, Accessibility, and Automation Permissions
 
@@ -124,6 +129,20 @@ Explicit perception check; this briefly captures the real display but prints onl
 ```bash
 .venv/bin/python scripts/mac_smoke.py --perception-live --browser chrome
 ```
+
+Fixed 4.0 observation matrix; open these Apps first:
+
+```bash
+.venv/bin/python scripts/mac_smoke.py --perception-live \
+  --browser "Google Chrome" \
+  --observe-app Safari \
+  --observe-app Finder \
+  --observe-app Obsidian \
+  --observe-app Xcode \
+  --observe-app Terminal
+```
+
+See [macOS E2E](macos-e2e.md) for the acceptance matrix and the latest recorded run.
 
 ## Checks Before Release
 

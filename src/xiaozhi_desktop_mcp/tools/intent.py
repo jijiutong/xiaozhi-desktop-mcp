@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..config import Settings
+from ..observations import observe_desktop
 from ..responses import fail
 from .accessibility import accessibility_capabilities, accessibility_tree
 from .apps import app_capabilities, app_status, close_app, focus_app, open_app
@@ -363,6 +364,19 @@ def _desktop_ui_action(settings: Settings, params: dict[str, Any]) -> dict:
     return create_pending_action("accessibility_action", pending_params, settings=settings)
 
 
+def _desktop_execute_step(settings: Settings, params: dict[str, Any]) -> dict:
+    pending_params = {
+        "observation_id": _str(params, "observation_id"),
+        "target": params.get("target", {}) if isinstance(params.get("target"), dict) else {},
+        "preconditions": params.get("preconditions", {}) if isinstance(params.get("preconditions"), dict) else {},
+        "action": params.get("action", {}) if isinstance(params.get("action"), dict) else {},
+        "expectation": params.get("expectation", {}) if isinstance(params.get("expectation"), dict) else {},
+        "idempotency_key": _str(params, "idempotency_key"),
+        "timeout_ms": _int(params, "timeout_ms", 5000),
+    }
+    return create_pending_action("desktop_execute_step", pending_params, settings=settings)
+
+
 def _str(params: dict[str, Any], key: str, default: str = "") -> str:
     return str(params.get(key, default))
 
@@ -384,6 +398,14 @@ def _int(params: dict[str, Any], key: str, default: int = 0) -> int:
 
 
 _HANDLERS = {
+    ("desktop", "observe"): lambda settings, params: observe_desktop(
+        settings,
+        _str(params, "app_name") or _str(params, "app"),
+        _int(params, "window_index", 1),
+        _int(params, "max_depth", 5),
+        _int(params, "max_elements", 200),
+    ),
+    ("desktop", "execute_step"): _desktop_execute_step,
     ("desktop", "screenshot"): lambda settings, params: capture_display(
         _int(params, "display_id", 1), _int(params, "max_width", 1600)
     ),

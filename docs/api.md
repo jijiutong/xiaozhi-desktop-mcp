@@ -36,6 +36,8 @@ or:
 X-Desktop-Mcp-Token: <token>
 ```
 
+The HTTP adapter token can be restricted with `DESKTOP_MCP_AUTH_SCOPES`. Action catalog policy metadata exposes `required_scope`; supported scopes are `screen:read`, `state:read`, `desktop:control`, and `*`. Composite `desktop_intent` and workflow requests require the union of their top-level and nested action scopes, so they cannot bypass read scopes. A missing scope returns HTTP 403 with `SCOPE_DENIED` before execution.
+
 Responses include `X-Request-Id`. Clients can pass their own `X-Request-Id`
 header; otherwise the server generates one and logs it.
 
@@ -132,6 +134,8 @@ category_registry
 desktop_screenshot
 desktop_window_screenshot
 desktop_ocr
+desktop_observe
+desktop_execute_step
 accessibility_capabilities
 accessibility_tree
 accessibility_action
@@ -210,7 +214,7 @@ Generic intent request:
 Built-in categories:
 
 ```text
-desktop  screenshot, window_screenshot, ocr, ui_tree, ui_action, capabilities
+desktop  screenshot, window_screenshot, ocr, observe, execute_step, ui_tree, ui_action, capabilities
 music    open, play, pause, toggle, next, previous, search, search_app, status, volume, capabilities
 docs     remember, search, create, open, append, daily
 ai       open, send, continue, status, focus, stop, slash, model
@@ -227,6 +231,17 @@ Use `GET /api/v2/actions` for parameter schemas, policy metadata, examples, and 
 Medium-risk actions such as `ask_cc`, `app_close`, `browser_control`, `music_search_app`, and Xcode actions create a persistent pending action. API v1 retains the legacy `confirm=true` behavior for compatibility; API v2 always requires the separate `pending_confirm` action.
 
 ## Desktop Perception and Accessibility
+
+For reliable UI writes, prefer the 4.0 observation-bound flow:
+
+1. Call `desktop_observe` for an allowlisted App window.
+2. Select a target from the returned semantic elements.
+3. Call `desktop_execute_step` with the `observation_id`, target, action, preconditions, and expectation.
+4. Confirm the returned pending action with `pending_confirm`.
+
+At confirmation time the service revalidates the window and semantic target. It executes the action once, then only re-observes until the expectation is satisfied or `timeout_ms` expires. Reusing an `idempotency_key` returns the stored result instead of repeating the write action.
+
+Stable 4.0 errors include `OBSERVATION_EXPIRED`, `WINDOW_CHANGED`, `TARGET_STALE`, `TARGET_AMBIGUOUS`, `PRECONDITION_FAILED`, `EXPECTATION_TIMEOUT`, and `RECOVERY_REQUIRED`.
 
 Capture a display for an HTTP client:
 
@@ -292,6 +307,19 @@ Create a validated plan without executing it:
 ```
 
 Call `workflow_execute` with the returned `workflow_id`. A workflow pauses with `status=waiting_confirmation` when a step creates a pending action. Confirm that action, then call `workflow_execute` again to resume. Workflow and pending state survive service restarts.
+
+4.0 workflows also support:
+
+- `retry.max_attempts` from 1 to 3 for explicitly read-only action steps;
+- low-risk `compensation` actions after a final failure;
+- `kind=wait` for bounded polling of a structured `data.*` result field;
+- `kind=condition` with schema-validated `then`/`else` branches and a restricted earlier-step field lookup.
+
+There is no general expression evaluator or unbounded loop.
+
+A wait step performs one poll per `workflow_execute` call. When its condition is not yet satisfied, the workflow returns `waiting_condition` with `next_poll_at`; resume it with another `workflow_execute` call.
+
+Workflow execution is protected by a renewable lease and fencing token. After a crashed lease expires, an interrupted read-only step can be replayed; an uncertain write step fails closed with `RECOVERY_REQUIRED`. `workflow_get` includes a redacted lifecycle event list without step parameters.
 
 ## Browser Drivers
 

@@ -7,8 +7,10 @@ from typing import Any
 
 from .action_registry import api_action_specs
 from .config import Settings
+from .execution import execute_desktop_step
+from .observations import observe_desktop
 from .responses import fail, ok
-from .storage import list_audit_events
+from .storage import WorkflowLeaseLost, list_audit_events
 from .tools.accessibility import accessibility_action, accessibility_capabilities, accessibility_tree
 from .tools.apps import app_capabilities, app_status, close_app, focus_app, open_app
 from .tools.browser import (
@@ -70,6 +72,11 @@ def dispatch(settings: Settings, action: str, params: dict | None = None, reques
     else:
         try:
             result = handler(settings, dict(params or {}))
+        except WorkflowLeaseLost:
+            result = fail(
+                "workflow execution lease lost; recovery required",
+                "工作流执行权已经转移，本次执行已安全停止。",
+            )
         except TypeError as exc:
             result = fail(f"invalid params for action {normalized}: {exc}", "参数不完整或格式不对，我没有执行。")
         except Exception:
@@ -176,6 +183,26 @@ def _accessibility_action(settings: Settings, params: dict[str, Any]) -> dict:
         pending_params,
         lambda: accessibility_action(settings, **pending_params),
         f"界面操作：{pending_params['command']}",
+    )
+
+
+def _desktop_execute_step(settings: Settings, params: dict[str, Any]) -> dict:
+    pending_params = {
+        "observation_id": _str(params, "observation_id"),
+        "target": params.get("target", {}) if isinstance(params.get("target"), dict) else {},
+        "preconditions": params.get("preconditions", {}) if isinstance(params.get("preconditions"), dict) else {},
+        "action": params.get("action", {}) if isinstance(params.get("action"), dict) else {},
+        "expectation": params.get("expectation", {}) if isinstance(params.get("expectation"), dict) else {},
+        "idempotency_key": _str(params, "idempotency_key"),
+        "timeout_ms": _int(params, "timeout_ms", 5000),
+    }
+    return _confirm_or_pending(
+        settings,
+        params,
+        "desktop_execute_step",
+        pending_params,
+        lambda: execute_desktop_step(settings, **pending_params),
+        "执行并验证桌面操作",
     )
 
 
@@ -420,6 +447,14 @@ def _workflow_execute(settings: Settings, params: dict[str, Any]) -> dict:
 
 
 _ACTION_HANDLERS: dict[str, ActionHandler] = {
+    "desktop_execute_step": _desktop_execute_step,
+    "desktop_observe": lambda settings, params: observe_desktop(
+        settings,
+        _str(params, "app_name"),
+        _int(params, "window_index", 1),
+        _int(params, "max_depth", 5),
+        _int(params, "max_elements", 200),
+    ),
     "accessibility_capabilities": lambda settings, params: accessibility_capabilities(
         settings, _str(params, "app_name")
     ),

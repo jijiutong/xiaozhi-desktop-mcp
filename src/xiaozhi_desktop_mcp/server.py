@@ -494,6 +494,51 @@ def desktop_ocr(
 
 
 @mcp_tool()
+def desktop_observe(
+    app_name: str,
+    window_index: int = 1,
+    max_depth: int = 5,
+    max_elements: int = 200,
+) -> dict:
+    """创建短期桌面观察，返回窗口身份、语义元素、指纹和 observation_id。"""
+    return api_v2_dispatch(
+        settings,
+        "desktop_observe",
+        {
+            "app_name": app_name,
+            "window_index": window_index,
+            "max_depth": max_depth,
+            "max_elements": max_elements,
+        },
+        client="mcp",
+    )
+
+
+@mcp_tool()
+def desktop_execute_step(
+    observation_id: str,
+    target: dict,
+    action: dict,
+    expectation: dict | None = None,
+    preconditions: dict | None = None,
+    idempotency_key: str = "",
+    timeout_ms: int = 5000,
+) -> dict:
+    """创建待确认的闭环桌面动作；确认后重新定位、执行一次并验证结果。"""
+    params = {
+        "observation_id": observation_id,
+        "target": target,
+        "action": action,
+        "expectation": expectation or {"kind": "tree_changed"},
+        "preconditions": preconditions or {},
+        "timeout_ms": timeout_ms,
+    }
+    if idempotency_key:
+        params["idempotency_key"] = idempotency_key
+    return api_v2_dispatch(settings, "desktop_execute_step", params, client="mcp")
+
+
+@mcp_tool()
 def accessibility_capabilities(app_name: str) -> dict:
     """查看白名单 App 支持的桌面感知和语义界面操作能力。"""
     return accessibility_capabilities_impl(settings, app_name)

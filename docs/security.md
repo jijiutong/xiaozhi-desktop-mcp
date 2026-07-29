@@ -32,6 +32,7 @@ These actions should create a pending action first or require explicit confirmat
 - Focus, close, reload, or navigate a browser tab through `browser_control`.
 - Type a query into NetEase Cloud Music through `music_search_app`.
 - Click, type, scroll, drag, choose menus, or operate a file dialog through `accessibility_action`.
+- Execute an observation-bound semantic write through `desktop_execute_step`.
 
 ## High Risk: Deny by Default
 
@@ -58,6 +59,10 @@ These actions should stay disabled unless a user explicitly opts in with strong 
 - HTTP screenshot responses contain base64 image data. Request logs and audit events do not store response images.
 - Accessibility `include_values=false` is the default so text-field values are not returned unless explicitly requested. Secure text fields stay redacted even when values are requested.
 - Pending Accessibility actions can contain input text or file paths because those values are needed after confirmation; protect the local state database accordingly.
+- 4.0 observations expire and persist only privacy-bounded element metadata. Screenshots, OCR text, UI values, and secure values are not stored in observation records.
+- A confirmed desktop step is bound to its observation and semantic target. Window changes, stale targets, failed preconditions, and ambiguous matches stop without acting.
+- Idempotency records prevent a completed desktop step from being repeated. An interrupted in-flight key fails closed with `RECOVERY_REQUIRED` rather than guessing whether to replay it.
+- Workflow leases fence stale runners. After a crash, only explicitly read-only steps are replayed; a write step with an unknown outcome is failed and requires reconciliation.
 - Password managers, credential stores, payments, account changes, permission changes, destructive file operations, and arbitrary coordinate clicks remain outside the supported action set.
 
 ## Generic Intent Rules
@@ -72,6 +77,8 @@ These actions should stay disabled unless a user explicitly opts in with strong 
 - Localhost mode can run without a token for personal desktop use.
 - Non-localhost HTTP binding requires `DESKTOP_MCP_AUTH_TOKEN`.
 - Protected `/api/...` routes accept `Authorization: Bearer <token>` or `X-Desktop-Mcp-Token`.
+- `DESKTOP_MCP_AUTH_SCOPES` restricts an authenticated HTTP token to `screen:read`, `state:read`, `desktop:control`, or `*`. Missing scopes return HTTP 403 with `SCOPE_DENIED`.
+- Composite desktop intents and workflows require every nested action scope in addition to their own control scope; wrapping a read action does not bypass its scope.
 - Standard Streamable HTTP MCP runs at `/mcp` by default and accepts the same
   token headers.
 - HTTP responses include `X-Request-Id`; logs include request id, path, status,
@@ -90,7 +97,8 @@ These actions should stay disabled unless a user explicitly opts in with strong 
 
 ## Persistent State and Audit
 
-- Pending actions, workflows, and audit events are stored in `DESKTOP_MCP_STATE_DB`.
+- Pending actions, workflows, redacted workflow events, and audit events are stored in `DESKTOP_MCP_STATE_DB`.
+- Schema migrations, short-lived observations, and desktop-step idempotency records use the same state database.
 - SQLite transactions prevent duplicate confirmation from executing an action twice.
 - Expired actions cannot be confirmed.
 - Audit events store request id, client, action, result, duration, and parameter names only.

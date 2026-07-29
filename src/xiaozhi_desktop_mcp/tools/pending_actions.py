@@ -38,6 +38,9 @@ class PendingAction:
 _pending_actions: dict[str, PendingAction] = {}
 _AX_ELEMENT_ID = re.compile(r"^ax:(?:root|[1-9]\d*(?:\.[1-9]\d*)*)$")
 _AX_COMMANDS = frozenset({"click", "input", "scroll", "drag", "menu_select", "file_dialog_choose"})
+_STEP_EXPECTATIONS = frozenset(
+    {"element_absent", "element_present", "element_enabled", "element_disabled", "tree_changed"}
+)
 
 
 def create_pending_action(
@@ -188,6 +191,19 @@ def _from_record(record: dict) -> PendingAction:
 
 def _execute(settings: Settings, action: PendingAction) -> dict:
     params = action.params
+    if action.action_type == "desktop_execute_step":
+        from ..execution import execute_desktop_step
+
+        return execute_desktop_step(
+            settings,
+            str(params.get("observation_id", "")),
+            dict(params.get("target", {})),
+            dict(params.get("preconditions", {})),
+            dict(params.get("action", {})),
+            dict(params.get("expectation", {})),
+            str(params.get("idempotency_key", "")),
+            int(params.get("timeout_ms", 5000)),
+        )
     if action.action_type == "accessibility_action":
         from .accessibility import accessibility_action
 
@@ -360,6 +376,57 @@ def _validate_params(action_type: str, params: dict[str, Any]) -> str:
             return "path is required for file_dialog_choose"
         if len(str(params.get("text", ""))) > 20000:
             return "text exceeds 20000 characters"
+    if action_type == "desktop_execute_step":
+        target = params.get("target")
+        action = params.get("action")
+        preconditions = params.get("preconditions", {})
+        expectation = params.get("expectation", {})
+        if not isinstance(target, dict) or not _AX_ELEMENT_ID.fullmatch(str(target.get("element_id", ""))):
+            return "desktop execute target requires a valid element_id"
+        if set(target) - {"element_id", "role", "subrole", "title", "description", "identifier"}:
+            return "desktop execute target contains unsupported fields"
+        if not isinstance(action, dict):
+            return "desktop execute action must be an object"
+        command = str(action.get("command", "")).strip().lower().replace("-", "_")
+        if command not in _AX_COMMANDS:
+            return "desktop execute action requires a supported command"
+        if set(action) - {"command", "target_element_id", "text", "direction", "amount", "path"}:
+            return "desktop execute action contains unsupported fields"
+        target_element_id = str(action.get("target_element_id", "")).strip()
+        if target_element_id and not _AX_ELEMENT_ID.fullmatch(target_element_id):
+            return "invalid target_element_id"
+        if command == "drag" and not target_element_id:
+            return "target_element_id is required for drag"
+        if command == "scroll":
+            direction = str(action.get("direction", "down")).strip().lower()
+            if direction not in {"up", "down", "left", "right"}:
+                return "direction must be up, down, left, or right"
+            amount = action.get("amount", 1)
+            if not isinstance(amount, int) or isinstance(amount, bool):
+                return "amount must be an integer"
+            if not 1 <= amount <= 20:
+                return "amount must be between 1 and 20"
+        if command == "file_dialog_choose" and not str(action.get("path", "")).strip():
+            return "path is required for file_dialog_choose"
+        if len(str(action.get("text", ""))) > 20000:
+            return "text exceeds 20000 characters"
+        if (
+            not isinstance(preconditions, dict)
+            or set(preconditions) - {"enabled", "focused", "selected"}
+            or any(not isinstance(value, bool) for value in preconditions.values())
+        ):
+            return "desktop execute preconditions are invalid"
+        if not isinstance(expectation, dict) or set(expectation) - {"kind"}:
+            return "desktop execute expectation must be an object"
+        kind = str(expectation.get("kind", "tree_changed"))
+        if kind not in _STEP_EXPECTATIONS:
+            return "desktop execute expectation is invalid"
+        try:
+            timeout_ms = int(params.get("timeout_ms", 5000))
+        except (TypeError, ValueError):
+            return "desktop execute timeout_ms must be an integer"
+        if not 100 <= timeout_ms <= 30000:
+            return "desktop execute timeout_ms must be between 100 and 30000"
     return ""
 
 

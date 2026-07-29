@@ -29,6 +29,9 @@ def test_load_settings_reads_app_aliases_from_yaml_and_env(tmp_path, monkeypatch
     monkeypatch.setenv("APP_AUTOMATION_ALIASES", "Google Chrome=Google Chrome")
     monkeypatch.setenv("DESKTOP_MCP_STATE_DB", str(tmp_path / "state.db"))
     monkeypatch.setenv("DESKTOP_MCP_PENDING_TTL_SECONDS", "900")
+    monkeypatch.setenv("DESKTOP_MCP_OBSERVATION_TTL_SECONDS", "180")
+    monkeypatch.setenv("DESKTOP_MCP_WORKFLOW_LEASE_SECONDS", "420")
+    monkeypatch.setenv("DESKTOP_MCP_AUTH_SCOPES", "screen:read,desktop:control")
     monkeypatch.setenv("DESKTOP_MCP_BROWSER_ALLOWED_DOMAINS", "example.com,docs.example.com")
 
     settings = load_settings()
@@ -42,4 +45,7 @@ def test_load_settings_reads_app_aliases_from_yaml_and_env(tmp_path, monkeypatch
     assert settings.app_automation_aliases["google chrome"] == "Google Chrome"
     assert settings.state_db_path == (tmp_path / "state.db").resolve()
     assert settings.pending_ttl_seconds == 900
+    assert settings.observation_ttl_seconds == 180
+    assert settings.workflow_lease_seconds == 420
+    assert settings.auth_scopes == frozenset({"screen:read", "desktop:control"})
     assert settings.browser_allowed_domains == frozenset({"example.com", "docs.example.com"})
